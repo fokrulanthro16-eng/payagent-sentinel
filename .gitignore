@@ -1,0 +1,42 @@
+# Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+*.coverage.*
+
+# Environment variables & secrets
+.env
+*.env.local
+*.pem
+*.key
+
+# IDEs & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Databases & local state
+*.sqlite3
+*.db
+local_ledger/
+
+# Frontend / Node
+node_modules/
+.next/
+dist/
+build/
+*.log
