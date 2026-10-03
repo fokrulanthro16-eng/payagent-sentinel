@@ -64,23 +64,23 @@ export const AGGridLedger: React.FC<AGGridLedgerProps> = ({ rowData }) => {
       headerName: 'Policy Decision',
       width: 150,
       cellRenderer: (params: any) => {
-        if (params.value === 'APPROVED') {
+        if (params.value === 'APPROVED' || params.value === 'PASSED') {
           return (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-              <ShieldCheck className="w-3.5 h-3.5" /> Approved
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <ShieldCheck className="w-3.5 h-3.5" /> PASSED
             </span>
           );
         }
-        if (params.value === 'BLOCKED') {
+        if (params.value === 'BLOCKED' || params.value === 'INTERCEPTED') {
           return (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30 animate-pulse">
-              <ShieldAlert className="w-3.5 h-3.5" /> Blocked
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse">
+              <ShieldAlert className="w-3.5 h-3.5" /> INTERCEPTED
             </span>
           );
         }
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-500/15 text-slate-400 border border-slate-500/30">
-            <Clock className="w-3.5 h-3.5" /> Pending
+            <Clock className="w-3.5 h-3.5" /> PENDING
           </span>
         );
       },
