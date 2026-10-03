@@ -111,7 +111,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -169,17 +174,24 @@ async def telemetry_stream() -> EventSourceResponse:
     async def event_generator() -> AsyncGenerator[Dict[str, str], None]:
         q = hub.register_sse()
         try:
-            # Yield initial connection message
+            # Yield initial connection confirmation
             yield {
                 "event": "connected",
                 "data": json.dumps({"status": "CONNECTED", "service": "PayAgent-Sentinel Telemetry"}),
             }
             while True:
-                data = await q.get()
-                yield {
-                    "event": data.get("event", "telemetry"),
-                    "data": json.dumps(data),
-                }
+                try:
+                    data = await asyncio.wait_for(q.get(), timeout=15.0)
+                    yield {
+                        "event": "telemetry",
+                        "data": json.dumps(data),
+                    }
+                except asyncio.TimeoutError:
+                    # Keepalive heartbeat ping
+                    yield {
+                        "event": "ping",
+                        "data": json.dumps({"time": datetime.now(timezone.utc).isoformat()}),
+                    }
         finally:
             hub.unregister_sse(q)
 
