@@ -203,21 +203,24 @@ async def agent_negotiate(req: NegotiateRequest):
     """Autonomous negotiation between Buyer Agent and Vendor Agent."""
     contract_id = f"cnt_{uuid.uuid4().hex[:10]}"
 
+    # 1. Buyer Agent Multi-LLM Reasoning
+    buyer_thought = await buyer_agent.reason_procurement_goal(req.goal, req.max_budget)
     await hub.broadcast(
         {
             "event": "AGENT_THINKING",
-            "agent": "BuyerAgent",
-            "message": f"Formulating procurement RFP: '{req.goal}' with max budget ${req.max_budget}",
+            "agent": "BuyerAgent [Gemini 2.5 Flash / Nebius]",
+            "message": buyer_thought,
             "contract_id": contract_id,
         }
     )
 
-    # Vendor evaluates and accepts RFP
+    # 2. Vendor Agent Multi-LLM Evaluation
+    vendor_thought = await vendor_agent.evaluate_rfp_proposal(req.goal, req.max_budget)
     await hub.broadcast(
         {
             "event": "AGENT_THINKING",
-            "agent": "VendorAgent",
-            "message": f"Vendor accepted proposal terms for {req.vendor_receiver}. Providing SLA hash guarantee.",
+            "agent": "VendorAgent [Gemini 2.5 Flash / Nebius]",
+            "message": vendor_thought,
             "contract_id": contract_id,
         }
     )

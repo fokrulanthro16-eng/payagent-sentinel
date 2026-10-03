@@ -11,22 +11,69 @@
 
 body {
   margin: 0;
-  background-color: #080c14;
+  background-color: #06080f;
+  background-image: 
+    radial-gradient(circle at 15% 20%, rgba(6, 182, 212, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.09) 0%, transparent 45%),
+    radial-gradient(circle at 50% 80%, rgba(0, 112, 186, 0.07) 0%, transparent 50%);
+  background-attachment: fixed;
   color: #e2e8f0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   overflow-x: hidden;
 }
 
-/* Custom AG Grid Dark Styling */
+/* Hyper-Glassmorphism Card Utilities */
+.glass-panel {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  border-radius: 16px;
+}
+
+.glass-panel-glow-cyan {
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  box-shadow: 0 0 25px rgba(6, 182, 212, 0.15);
+}
+
+.glass-panel-glow-violet {
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  box-shadow: 0 0 25px rgba(139, 92, 246, 0.15);
+}
+
+/* Custom AG Grid Hyper-Glass Overrides */
 .ag-theme-alpine-dark {
-  --ag-background-color: #0d1527;
-  --ag-header-background-color: #090f1d;
-  --ag-odd-row-background-color: #0f182c;
-  --ag-border-color: #1e293b;
+  --ag-background-color: rgba(10, 15, 30, 0.6);
+  --ag-header-background-color: rgba(15, 23, 42, 0.85);
+  --ag-odd-row-background-color: rgba(15, 23, 42, 0.3);
+  --ag-border-color: rgba(255, 255, 255, 0.07);
   --ag-header-foreground-color: #94a3b8;
   --ag-foreground-color: #f1f5f9;
-  --ag-row-hover-color: #1e293b;
-  --ag-selected-row-background-color: #1e3a5f;
+  --ag-row-hover-color: rgba(6, 182, 212, 0.08);
+  --ag-selected-row-background-color: rgba(6, 182, 212, 0.15);
   font-family: 'JetBrains Mono', monospace, ui-monospace, sans-serif;
   font-size: 13px;
+  border-radius: 12px;
+}
+
+.ag-theme-alpine-dark .ag-root-wrapper {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.4);
 }

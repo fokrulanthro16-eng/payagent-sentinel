@@ -4,7 +4,7 @@ import { AGGridLedger } from './components/AGGridLedger';
 import type { LedgerRowData } from './components/AGGridLedger';
 import { AgentReasoningFeed } from './components/AgentReasoningFeed';
 import type { TelemetryLog } from './components/AgentReasoningFeed';
-import { Shield, Lock, Database, Wifi, WifiOff } from 'lucide-react';
+import { Shield, Lock, Database, Wifi, WifiOff, Sparkles } from 'lucide-react';
 
 const API_BASE = 'http://127.0.0.1:8000';
 
@@ -60,7 +60,7 @@ export const App: React.FC = () => {
         amount: Number(event.amount || 0),
         policyDecision: 'PENDING',
         paypalOrderId: 'PENDING',
-        riskScore: 12,
+        riskScore: 8,
         status: 'NEGOTIATED',
       };
       setLedgerRows((prev) => [row, ...prev.filter((r) => r.id !== event.contract_id)]);
@@ -68,7 +68,7 @@ export const App: React.FC = () => {
       setLedgerRows((prev) =>
         prev.map((r) =>
           r.id === event.contract_id
-            ? { ...r, policyDecision: 'APPROVED', riskScore: 5 }
+            ? { ...r, policyDecision: 'PASSED', riskScore: 4 }
             : r
         )
       );
@@ -97,11 +97,11 @@ export const App: React.FC = () => {
       const rogueRow: LedgerRowData = {
         id: event.contract_id || `rogue_${Date.now()}`,
         timestamp: event.timestamp || new Date().toISOString(),
-        action: `BLOCKED: ${event.attack_type || 'POLICY_VIOLATION'}`,
+        action: `INTERCEPTED: ${event.attack_type || 'HARD_CAP_BREACH'}`,
         targetVendor: event.vendor || 'unauthorized_entity',
         amount: Number(event.amount || 0),
-        policyDecision: 'BLOCKED',
-        paypalOrderId: 'REJECTED',
+        policyDecision: 'INTERCEPTED',
+        paypalOrderId: 'BLOCKED',
         riskScore: 99,
         status: 'BLOCKED',
       };
@@ -150,7 +150,6 @@ export const App: React.FC = () => {
         sse.onerror = () => {
           setIsConnected(false);
           sse?.close();
-          // Auto-reconnect after 3s
           reconnectTimeout = setTimeout(connectSSE, 3000);
         };
       } catch (err) {
@@ -225,13 +224,13 @@ export const App: React.FC = () => {
           handleEvent({
             event: 'ESCROW_FUNDS_HELD',
             contract_id: mockContractId,
-            paypal_order_id: `MOCK_PP_ORD_${Math.floor(Math.random() * 900000 + 100000)}`,
+            paypal_order_id: `ORD-SANDBOX-AUTH-${Math.floor(Math.random() * 900000 + 100000)}`,
           });
           handleEvent({
             event: 'ESCROW_SETTLED',
             contract_id: mockContractId,
-            paypal_order_id: `MOCK_PP_ORD_SETTLED`,
-            paypal_capture_id: `MOCK_PP_CAP_${Math.floor(Math.random() * 900000 + 100000)}`,
+            paypal_order_id: `ORD-SANDBOX-AUTH-SETTLED`,
+            paypal_capture_id: `CAP-SANDBOX-SETTLED-${Math.floor(Math.random() * 900000 + 100000)}`,
           });
           return;
         }
@@ -260,8 +259,8 @@ export const App: React.FC = () => {
           handleEvent({
             event: 'ESCROW_SETTLED',
             contract_id: negData.contract.contract_id,
-            paypal_order_id: 'PP_ORDER_SIMULATED',
-            paypal_capture_id: 'PP_CAPTURE_SIMULATED',
+            paypal_order_id: 'ORD-SANDBOX-AUTH-SIMULATED',
+            paypal_capture_id: 'CAP-SANDBOX-SETTLED-SIMULATED',
             amount: budget,
             vendor: negData.contract.vendor_paypal_receiver,
           });
@@ -278,7 +277,7 @@ export const App: React.FC = () => {
         appendLog({
           event: 'ATTACK_SIMULATION',
           agent: 'PromptCommander',
-          message: `Dispatched adversarial payload: ${isDrain ? 'Unauthorized $1,850 drain attempt' : 'Unauthorized vendor spend'}`,
+          message: `Dispatched adversarial payload: ${isDrain ? 'Unauthorized $1,850 drain attempt (> $100 cap)' : 'Unauthorized vendor spend'}`,
         });
 
         try {
@@ -298,7 +297,6 @@ export const App: React.FC = () => {
             reason: data.reason,
           });
         } catch (err) {
-          // Direct fallback mock if network fails
           handleEvent({
             event: 'ROGUE_SPEND_INTERCEPTED',
             contract_id: `rogue_${Date.now()}`,
@@ -307,7 +305,7 @@ export const App: React.FC = () => {
             vendor: isDrain ? 'verified_vendor_ai@enterprise.com' : 'unauthorized_darkweb_syndicate@exploit.net',
             rejection_code: isDrain ? 'ERR_MAX_SINGLE_LIMIT_EXCEEDED' : 'ERR_UNAUTHORIZED_VENDOR',
             reason: isDrain
-              ? 'Transaction amount $1850.00 exceeds single transaction cap of $1000.00'
+              ? 'Transaction amount $1850.00 exceeds single transaction cap of $100.00'
               : 'Target vendor is not on authorized recipient whitelist.',
           });
         }
@@ -325,20 +323,24 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#080c14] text-slate-100 flex flex-col font-sans">
-      {/* Top Navigation Bar */}
-      <header className="border-b border-[#1f293d] bg-[#090f1d]/90 backdrop-blur sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-[#0070ba] rounded-lg shadow-lg shadow-[#0070ba]/30">
+    <div className="min-h-screen text-slate-100 flex flex-col font-sans relative selection:bg-cyan-500/30 selection:text-cyan-200">
+      {/* Background radial glow accents */}
+      <div className="fixed top-12 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed bottom-12 right-1/4 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Top Navigation Bar with Hyper-Glass styling */}
+      <header className="border-b border-white/10 bg-[#06080f]/80 backdrop-blur-xl sticky top-0 z-50 px-8 py-4 flex items-center justify-between shadow-lg">
+        <div className="flex items-center space-x-3.5">
+          <div className="p-2.5 bg-gradient-to-tr from-[#0070ba] to-cyan-500 rounded-xl shadow-lg shadow-cyan-500/20 border border-white/20">
             <Shield className="w-5 h-5 text-white" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black tracking-wide bg-gradient-to-r from-white via-slate-200 to-sky-400 bg-clip-text text-transparent">
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-white via-cyan-100 to-cyan-400 bg-clip-text text-transparent">
                 PayAgent-Sentinel
               </h1>
-              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-[#0070ba]/20 text-[#00e5ff] border border-[#0070ba]/40">
-                PayPal AI 2026
+              <span className="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold shadow-sm shadow-cyan-500/20">
+                PayPal AI Hackathon 2026
               </span>
             </div>
             <p className="text-xs text-slate-400">Zero-Trust Multi-Agent Autonomous Escrow & Cryptographic Policy Engine</p>
@@ -346,8 +348,8 @@ export const App: React.FC = () => {
         </div>
 
         {/* Live System Status Badges */}
-        <div className="flex items-center space-x-4 text-xs font-mono">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0e1726] border border-[#1f293d]">
+        <div className="flex items-center space-x-3.5 text-xs font-mono">
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/60 border border-white/10 backdrop-blur-md shadow-sm">
             {isConnected ? (
               <Wifi className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
             ) : (
@@ -359,26 +361,32 @@ export const App: React.FC = () => {
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0e1726] border border-[#1f293d]">
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/60 border border-white/10 backdrop-blur-md shadow-sm">
             <Lock className="w-3.5 h-3.5 text-cyan-400" />
             <span className="text-slate-400">Zero-Trust Arbiter:</span>
-            <span className="text-emerald-400 font-bold">ENFORCED</span>
+            <span className="text-emerald-400 font-bold">ENFORCED ($100 CAP)</span>
           </div>
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0e1726] border border-[#1f293d]">
-            <Database className="w-3.5 h-3.5 text-sky-400" />
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/60 border border-white/10 backdrop-blur-md shadow-sm">
+            <Database className="w-3.5 h-3.5 text-violet-400" />
             <span className="text-slate-400">SHA-256 Ledger:</span>
             <span className="text-emerald-400 font-bold">ACTIVE</span>
+          </div>
+
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/60 border border-white/10 backdrop-blur-md shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+            <span className="text-slate-400">PayPal REST:</span>
+            <span className="text-cyan-300 font-bold">SANDBOX v2</span>
           </div>
         </div>
       </header>
 
       {/* Main Cockpit Grid */}
-      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6">
+      <main className="flex-1 p-8 max-w-[1700px] w-full mx-auto space-y-6 relative z-10">
         {/* Row 1: Command & Natural Language Prompt Input */}
         <PromptCommander onExecute={handleExecuteAction} loading={loading} />
 
-        {/* Row 2: Dual Grid Layout (AG Grid Ledger + Live Reasoning Terminal) */}
+        {/* Row 2: Dual Grid Layout (Hyper-Glass AG Grid Ledger + Live Reasoning Terminal) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <AGGridLedger rowData={ledgerRows} />
           <AgentReasoningFeed logs={telemetryLogs} />
@@ -386,12 +394,13 @@ export const App: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-[#1f293d] px-6 py-3 text-xs text-slate-500 flex justify-between items-center bg-[#090f1d]">
-        <div>
-          PayAgent-Sentinel &bull; Multi-Agent Escrow Arbiter &bull; PayPal AI Hackathon 2026
+      <footer className="border-t border-white/10 px-8 py-3.5 text-xs text-slate-500 flex justify-between items-center bg-[#06080f]/90 backdrop-blur-md z-10">
+        <div className="flex items-center gap-2">
+          <span>PayAgent-Sentinel &bull; Zero-Trust Multi-Agent Autonomous Escrow</span>
+          <span className="text-cyan-400/80">&bull; Gemini 2.5 Flash + Nebius Token Factory</span>
         </div>
-        <div className="flex items-center gap-2 font-mono text-[11px]">
-          <span>Track: Agentic Commerce ($5,000) & PayPal + AI ($5,000)</span>
+        <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400">
+          <span>Target Tracks: Best Use of Agentic Commerce ($5,000) &bull; Best Use of PayPal + AI ($5,000)</span>
         </div>
       </footer>
     </div>
