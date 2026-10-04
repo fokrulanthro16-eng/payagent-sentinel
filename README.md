@@ -111,17 +111,17 @@ Protects corporate wallets against adversarial prompt injection, recursive loops
 
 | 01. Enterprise Mission Control Cockpit | 02. Enterprise Policy Vault & Governance |
 |:---:|:---:|
-| ![Cockpit Overview](docs/screenshots/01_main_cockpit_overview.png) | ![Policy Vault](docs/screenshots/02_policy_vault_governance.png) |
+| ![Mission Control](docs/screenshots/01_main_cockpit_overview.png) | ![Policy Vault](docs/screenshots/02_policy_vault_governance.png) |
 | *Real-time financial metrics, PayPal ROI take-rate (3.5%), and live SSE stream.* | *Dynamic sliders for per-transaction caps ($50-$500), hourly velocity, and whitelist controls.* |
 
 | 03. Tier 1 Autonomous Settlement | 04. Multi-LLM Telemetry Reasoning |
 |:---:|:---:|
-| ![Tier 1 Settled](docs/screenshots/03_tier1_autonomous_settled.png) | ![Reasoning Stream](docs/screenshots/04_multi_llm_reasoning_stream.png) |
+| ![Tier 1 Settlement](docs/screenshots/03_tier1_autonomous_settled.png) | ![Multi-LLM Reasoning](docs/screenshots/04_multi_llm_reasoning_stream.png) |
 | *Autonomous $14.50 escrow settlement with green PASSED badge and PayPal Order ID.* | *NVIDIA Nemotron via Nebius and Gemini 2.5 Flash streaming bilateral contract analysis.* |
 
 | 05. Rogue Drain Intercepted ($1,850) | 06. SLA Breach Auto-Refund Enforcement |
 |:---:|:---:|
-| ![Rogue Drain](docs/screenshots/05_rogue_drain_intercepted.png) | ![Auto Refund](docs/screenshots/06_sla_auto_refund_enforcement.png) |
+| ![Rogue Drain Intercepted](docs/screenshots/05_rogue_drain_intercepted.png) | ![SLA Auto Refund](docs/screenshots/06_sla_auto_refund_enforcement.png) |
 | *Adversarial prompt injection intercepted, preserving $1,850 in corporate capital.* | *Autonomous buyer refund triggered after SLA timeout, logging REFUNDED state.* |
 
 ---
