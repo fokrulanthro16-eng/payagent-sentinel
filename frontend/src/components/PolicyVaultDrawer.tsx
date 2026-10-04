@@ -29,6 +29,12 @@ export const PolicyVaultDrawer: React.FC<PolicyVaultDrawerProps> = ({
   const [tier2Max, setTier2Max] = useState(config.tier_2_max);
   const [saving, setSaving] = useState(false);
 
+  React.useEffect(() => {
+    setHardCap(config.hard_cap);
+    setTier1Max(config.tier_1_max);
+    setTier2Max(config.tier_2_max);
+  }, [config]);
+
   if (!isOpen) return null;
 
   const handleSaveAll = async () => {
@@ -72,26 +78,37 @@ export const PolicyVaultDrawer: React.FC<PolicyVaultDrawerProps> = ({
 
         {/* Content Sliders & Configurations */}
         <div className="space-y-6 flex-1">
-          {/* 1. Hard Cap Slider */}
+          {/* 1. Hard Cap Slider ($50 to $500) */}
           <div className="glass-panel p-4 space-y-2">
             <div className="flex justify-between items-center text-xs font-mono">
-              <span className="text-slate-300 font-semibold">Single-Transaction Hard Cap</span>
+              <span className="text-slate-300 font-semibold">Per-Transaction Cap</span>
               <span className="text-cyan-400 font-bold text-sm">${hardCap}</span>
             </div>
             <input
               type="range"
-              min="10"
-              max="1000"
+              min="50"
+              max="500"
               step="10"
               value={hardCap}
               onChange={(e) => setHardCap(Number(e.target.value))}
               className="w-full accent-cyan-400 cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-              <span>$10</span>
+              <span>$50</span>
+              <span>$250</span>
               <span>$500</span>
-              <span>$1,000</span>
             </div>
+          </div>
+
+          {/* 1b. Hourly Velocity Vault */}
+          <div className="glass-panel p-4 space-y-2">
+            <div className="flex justify-between items-center text-xs font-mono">
+              <span className="text-slate-300 font-semibold">Hourly Velocity Vault</span>
+              <span className="text-violet-400 font-bold text-sm">${config.hourly_velocity_limit}</span>
+            </div>
+            <p className="text-[11px] text-slate-400 font-mono">
+              Hard 24h rolling velocity governor protects against automated multi-agent draining loops.
+            </p>
           </div>
 
           {/* 2. Tier 1 & Tier 2 Thresholds */}

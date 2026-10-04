@@ -14,8 +14,8 @@ class PolicyTier(str, Enum):
 class PolicyConfig(BaseModel):
     tier_1_max: Decimal = Decimal("50.00")
     tier_2_max: Decimal = Decimal("200.00")
-    hard_cap: Decimal = Decimal("1000.00")
-    hourly_velocity_limit: Decimal = Decimal("2500.00")
+    hard_cap: Decimal = Decimal("100.00")
+    hourly_velocity_limit: Decimal = Decimal("1000.00")
     take_rate_percentage: Decimal = Decimal("3.50")
     whitelisted_agents: Set[str] = Field(default_factory=lambda: {
         "buyer_ai_procure_agent",

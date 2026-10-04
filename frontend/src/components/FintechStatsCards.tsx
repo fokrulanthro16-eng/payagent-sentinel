@@ -5,6 +5,8 @@ interface FintechStatsProps {
   settledPayouts: number;
   fraudIntercepted: number;
   arbiterStatus: string;
+  hardCap?: number;
+  hourlyLimit?: number;
   onOpenVault: () => void;
 }
 
@@ -13,6 +15,8 @@ export const FintechStatsCards: React.FC<FintechStatsProps> = ({
   settledPayouts,
   fraudIntercepted,
   arbiterStatus,
+  hardCap = 100,
+  hourlyLimit = 1000,
   onOpenVault,
 }) => {
   const escrowFeeGenerated = settledPayouts * 0.035;
@@ -132,20 +136,30 @@ export const FintechStatsCards: React.FC<FintechStatsProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-6 text-xs font-mono">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-5 text-xs font-mono">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-cyan-950/40 border border-cyan-500/30">
+            <span className="text-slate-400">Per-Transaction Cap:</span>
+            <span className="text-cyan-400 font-bold">${hardCap}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-violet-950/40 border border-violet-500/30">
+            <span className="text-slate-400">Hourly Velocity Vault:</span>
+            <span className="text-violet-400 font-bold">${hourlyLimit}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
             <span className="text-slate-400">Take-Rate Generated (3.5%):</span>
             <span className="text-cyan-400 font-bold">${escrowFeeGenerated.toFixed(2)}</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400">Fraud Loss Prevented:</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400">Fraud Prevented:</span>
             <span className="text-rose-400 font-bold">${fraudIntercepted.toFixed(2)}</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400">SLA Enforcement Rate:</span>
-            <span className="text-emerald-400 font-bold">100.0%</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400">SLA Enforcement:</span>
+            <span className="text-emerald-400 font-bold">100%</span>
           </div>
         </div>
       </div>

@@ -353,6 +353,7 @@ async def get_policy_vault():
 
 
 @app.post("/api/v1/policy/vault")
+@app.post("/api/v1/policy/update")
 async def update_policy_vault(req: PolicyVaultUpdateRequest):
     """Live update of enterprise policy vault rules."""
     if req.tier_1_max is not None:
@@ -364,6 +365,7 @@ async def update_policy_vault(req: PolicyVaultUpdateRequest):
         settings.SENTINEL_MAX_SINGLE_TRANSACTION = req.hard_cap
     if req.hourly_velocity_limit is not None:
         policy_engine.config.hourly_velocity_limit = req.hourly_velocity_limit
+        settings.SENTINEL_MAX_DAILY_VELOCITY = req.hourly_velocity_limit
     if req.whitelist_add:
         policy_engine.config.whitelisted_agents.add(req.whitelist_add)
     if req.blacklist_add:
@@ -374,6 +376,7 @@ async def update_policy_vault(req: PolicyVaultUpdateRequest):
             "event": "POLICY_VAULT_UPDATED",
             "hard_cap": str(policy_engine.config.hard_cap),
             "tier_1_max": str(policy_engine.config.tier_1_max),
+            "hourly_velocity_limit": str(policy_engine.config.hourly_velocity_limit),
         }
     )
     return {"status": "UPDATED", "vault": await get_policy_vault()}
@@ -651,6 +654,7 @@ async def simulate_rogue_attack(req: SimulateAttackRequest):
 
 
 @app.get("/api/v1/ledger", response_model=List[LedgerBlock])
+@app.get("/api/v1/ledger/history")
 async def get_ledger_blocks():
     return ledger.chain
 

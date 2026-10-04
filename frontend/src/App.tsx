@@ -11,9 +11,21 @@ import { Shield, Database, Wifi, WifiOff, Sliders } from 'lucide-react';
 
 const API_BASE = 'http://127.0.0.1:8000';
 
+const STORAGE_KEY_LEDGER = 'sentinel_ledger_rows_v2';
+
 export const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [ledgerRows, setLedgerRows] = useState<LedgerRowData[]>([]);
+  const [ledgerRows, setLedgerRows] = useState<LedgerRowData[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_LEDGER);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Failed to load ledger from localStorage:', e);
+    }
+    return [];
+  });
   const [telemetryLogs, setTelemetryLogs] = useState<TelemetryLog[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -22,8 +34,8 @@ export const App: React.FC = () => {
   const [vaultConfig, setVaultConfig] = useState<VaultConfig>({
     tier_1_max: 50.00,
     tier_2_max: 200.00,
-    hard_cap: 1000.00,
-    hourly_velocity_limit: 2500.00,
+    hard_cap: 100.00,
+    hourly_velocity_limit: 1000.00,
     take_rate_percentage: 3.50,
     whitelisted_agents: [
       'buyer_ai_procure_agent',
@@ -36,6 +48,15 @@ export const App: React.FC = () => {
       'unauthorized_darkweb_syndicate@exploit.net',
     ],
   });
+
+  // Persist ledger rows to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_LEDGER, JSON.stringify(ledgerRows));
+    } catch (e) {
+      console.warn('Failed to save ledger to localStorage:', e);
+    }
+  }, [ledgerRows]);
 
   // Dynamic Fintech Metric Calculations
   const metrics = useMemo(() => {
@@ -57,7 +78,7 @@ export const App: React.FC = () => {
     return { totalEscrowVolume, settledPayouts, fraudIntercepted };
   }, [ledgerRows]);
 
-  // Load live vault config on start
+  // Load live vault config and initial ledger history if local storage is empty
   useEffect(() => {
     fetch(`${API_BASE}/api/v1/policy/vault`)
       .then((res) => res.json())
@@ -67,11 +88,45 @@ export const App: React.FC = () => {
         }
       })
       .catch((err) => console.warn('Could not fetch vault config:', err));
+
+    // Fetch initial history if no local storage records
+    if (ledgerRows.length === 0) {
+      fetch(`${API_BASE}/api/v1/ledger/history`)
+        .then((res) => res.json())
+        .then((blocks) => {
+          if (Array.isArray(blocks) && blocks.length > 1) {
+            const rows: LedgerRowData[] = blocks
+              .filter((b) => b.action !== 'GENESIS')
+              .map((b) => ({
+                id: b.contract_id,
+                timestamp: b.timestamp,
+                action: b.action,
+                targetVendor: b.data?.vendor || 'verified_vendor_ai@enterprise.com',
+                amount: Number(b.data?.amount || 14.50),
+                policyDecision: b.action.includes('BLOCKED') ? 'INTERCEPTED' : 'PASSED',
+                paypalOrderId: b.data?.paypal_order_id || b.contract_id,
+                paypalCaptureId: b.data?.paypal_capture_id,
+                riskScore: b.action.includes('BLOCKED') ? 99 : 5,
+                status: b.action.includes('SETTLED')
+                  ? 'SETTLED'
+                  : b.action.includes('BLOCKED')
+                  ? 'BLOCKED'
+                  : b.action.includes('REFUND')
+                  ? 'REFUNDED'
+                  : 'NEGOTIATED',
+              }));
+            if (rows.length > 0) {
+              setLedgerRows(rows.reverse());
+            }
+          }
+        })
+        .catch((err) => console.warn('Could not fetch ledger history:', err));
+    }
   }, []);
 
   const handleSaveVault = async (updated: Partial<VaultConfig>) => {
     try {
-      const res = await fetch(`${API_BASE}/api/v1/policy/vault`, {
+      const res = await fetch(`${API_BASE}/api/v1/policy/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
@@ -284,26 +339,27 @@ export const App: React.FC = () => {
   // Execute Action from UI
   const handleExecuteAction = async (
     type: 'procure' | 'tier2_audit' | 'tier3_human' | 'sla_timeout' | 'rogue_drain' | 'rogue_vendor' | 'legitimate',
-    customGoal?: string
+    customGoal?: string,
+    customBudget?: number
   ) => {
     setLoading(true);
 
     try {
       if (type === 'procure' || type === 'tier2_audit' || type === 'tier3_human' || type === 'sla_timeout' || type === 'legitimate') {
-        let budget = 14.50;
+        let budget = customBudget !== undefined ? customBudget : 14.50;
         let goal = customGoal || 'Procure 2x H100 GPU compute hours';
 
         if (type === 'tier2_audit') {
-          budget = 120.00;
+          budget = customBudget !== undefined ? customBudget : 120.00;
           goal = customGoal || 'Tier 2 Procurement: Full Fine-tuning Cluster ($120.00)';
         } else if (type === 'tier3_human') {
-          budget = 350.00;
+          budget = customBudget !== undefined ? customBudget : 350.00;
           goal = customGoal || 'Tier 3 Heavy Compute Cluster: Multi-Node H100 ($350.00)';
         } else if (type === 'sla_timeout') {
-          budget = 35.00;
+          budget = customBudget !== undefined ? customBudget : 35.00;
           goal = customGoal || 'Simulate SLA Breach & Escrow Auto-Refund ($35.00)';
         } else if (type === 'legitimate') {
-          budget = 45.00;
+          budget = customBudget !== undefined ? customBudget : 45.00;
           goal = customGoal || 'Complete verified dataset batch processing';
         }
 
@@ -413,7 +469,9 @@ export const App: React.FC = () => {
                 Enterprise Production Suite
               </span>
             </div>
-            <p className="text-xs text-slate-400">Zero-Trust Multi-Agent Autonomous Escrow & Dynamic Policy Engine</p>
+            <p className="text-xs text-slate-400 font-medium">
+              Zero-Trust Multi-Agent Autonomous Escrow via PayPal B2B Pre-Approved Vault &amp; Cryptographic SLA Engine
+            </p>
           </div>
         </div>
 
@@ -455,6 +513,8 @@ export const App: React.FC = () => {
           settledPayouts={metrics.settledPayouts}
           fraudIntercepted={metrics.fraudIntercepted}
           arbiterStatus="ACTIVE"
+          hardCap={vaultConfig.hard_cap}
+          hourlyLimit={vaultConfig.hourly_velocity_limit}
           onOpenVault={() => setIsVaultOpen(true)}
         />
 

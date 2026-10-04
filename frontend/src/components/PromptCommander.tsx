@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { Play, ShieldAlert, Zap, Cpu, Terminal, Sparkles, RefreshCcw, UserCheck } from 'lucide-react';
 
 interface PromptCommanderProps {
-  onExecute: (type: 'procure' | 'tier2_audit' | 'tier3_human' | 'sla_timeout' | 'rogue_drain' | 'rogue_vendor' | 'legitimate', customGoal?: string) => Promise<void>;
+  onExecute: (
+    type: 'procure' | 'tier2_audit' | 'tier3_human' | 'sla_timeout' | 'rogue_drain' | 'rogue_vendor' | 'legitimate',
+    customGoal?: string,
+    customBudget?: number
+  ) => Promise<void>;
   loading: boolean;
 }
 
@@ -11,8 +15,22 @@ export const PromptCommander: React.FC<PromptCommanderProps> = ({ onExecute, loa
 
   const handleCustomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customGoal.trim() || loading) return;
-    onExecute('procure', customGoal.trim());
+    const trimmed = customGoal.trim();
+    if (!trimmed || loading) return;
+
+    // Detect budget from natural text e.g. "$80", "$80.00", "80 budget", "budget of $150"
+    let budget: number | undefined;
+    const matchDollar = trimmed.match(/\$(\d+(\.\d+)?)/);
+    if (matchDollar) {
+      budget = parseFloat(matchDollar[1]);
+    } else {
+      const matchBudget = trimmed.match(/(\d+(\.\d+)?)\s*(?:usd|dollars|budget)/i);
+      if (matchBudget) {
+        budget = parseFloat(matchBudget[1]);
+      }
+    }
+
+    onExecute('procure', trimmed, budget);
     setCustomGoal('');
   };
 
