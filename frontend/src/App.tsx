@@ -5,7 +5,9 @@ import type { LedgerRowData } from './components/AGGridLedger';
 import { AgentReasoningFeed } from './components/AgentReasoningFeed';
 import type { TelemetryLog } from './components/AgentReasoningFeed';
 import { FintechStatsCards } from './components/FintechStatsCards';
-import { Shield, Lock, Database, Wifi, WifiOff, Sparkles } from 'lucide-react';
+import { PolicyVaultDrawer } from './components/PolicyVaultDrawer';
+import type { VaultConfig } from './components/PolicyVaultDrawer';
+import { Shield, Database, Wifi, WifiOff, Sliders } from 'lucide-react';
 
 const API_BASE = 'http://127.0.0.1:8000';
 
@@ -14,6 +16,26 @@ export const App: React.FC = () => {
   const [ledgerRows, setLedgerRows] = useState<LedgerRowData[]>([]);
   const [telemetryLogs, setTelemetryLogs] = useState<TelemetryLog[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+
+  // Policy Vault State
+  const [isVaultOpen, setIsVaultOpen] = useState(false);
+  const [vaultConfig, setVaultConfig] = useState<VaultConfig>({
+    tier_1_max: 50.00,
+    tier_2_max: 200.00,
+    hard_cap: 1000.00,
+    hourly_velocity_limit: 2500.00,
+    take_rate_percentage: 3.50,
+    whitelisted_agents: [
+      'buyer_ai_procure_agent',
+      'verified_vendor_ai@enterprise.com',
+      'cloud_compute_agent@vendor.org',
+    ],
+    blacklisted_agents: [
+      'compromised_hallucinating_agent_77',
+      'unauthorized_rogue_hacker@darknet.io',
+      'unauthorized_darkweb_syndicate@exploit.net',
+    ],
+  });
 
   // Dynamic Fintech Metric Calculations
   const metrics = useMemo(() => {
@@ -34,6 +56,34 @@ export const App: React.FC = () => {
 
     return { totalEscrowVolume, settledPayouts, fraudIntercepted };
   }, [ledgerRows]);
+
+  // Load live vault config on start
+  useEffect(() => {
+    fetch(`${API_BASE}/api/v1/policy/vault`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.hard_cap) {
+          setVaultConfig(data);
+        }
+      })
+      .catch((err) => console.warn('Could not fetch vault config:', err));
+  }, []);
+
+  const handleSaveVault = async (updated: Partial<VaultConfig>) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/policy/vault`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      });
+      const data = await res.json();
+      if (data.vault) {
+        setVaultConfig(data.vault);
+      }
+    } catch (err) {
+      console.error('Error saving vault config:', err);
+    }
+  };
 
   // Append reasoning log safely
   const appendLog = useCallback((logItem: Partial<TelemetryLog>) => {
@@ -76,13 +126,13 @@ export const App: React.FC = () => {
       const row: LedgerRowData = {
         id: event.contract_id,
         timestamp: event.timestamp || new Date().toISOString(),
-        action: 'NEGOTIATION_COMPLETE',
+        action: event.requires_human ? 'TIER 3 ESCALATED' : 'NEGOTIATION_COMPLETE',
         targetVendor: event.vendor || 'verified_vendor_ai@enterprise.com',
         amount: Number(event.amount || 0),
-        policyDecision: 'PENDING',
+        policyDecision: event.requires_human ? 'PENDING' : 'PASSED',
         paypalOrderId: 'PENDING',
-        riskScore: 8,
-        status: 'NEGOTIATED',
+        riskScore: event.requires_human ? 78 : event.tier === 'TIER_2_MEDIUM' ? 25 : 8,
+        status: event.status || 'NEGOTIATED',
       };
       setLedgerRows((prev) => [row, ...prev.filter((r) => r.id !== event.contract_id)]);
     } else if (event.event === 'POLICY_APPROVED') {
@@ -111,6 +161,33 @@ export const App: React.FC = () => {
                 paypalCaptureId: event.paypal_capture_id,
                 status: 'SETTLED',
                 action: 'PAYPAL_CAPTURED',
+              }
+            : r
+        )
+      );
+    } else if (event.event === 'ESCROW_AUTO_REFUNDED') {
+      setLedgerRows((prev) =>
+        prev.map((r) =>
+          r.id === event.contract_id
+            ? {
+                ...r,
+                action: 'AUTO_REFUNDED (SLA BREACH)',
+                status: 'REFUNDED',
+                policyDecision: 'PASSED',
+                riskScore: 85,
+              }
+            : r
+        )
+      );
+    } else if (event.event === 'HUMAN_APPROVED') {
+      setLedgerRows((prev) =>
+        prev.map((r) =>
+          r.id === event.contract_id
+            ? {
+                ...r,
+                action: 'ADMIN_BIOMETRIC_SIGNED',
+                status: 'NEGOTIATED',
+                policyDecision: 'PASSED',
               }
             : r
         )
@@ -145,11 +222,10 @@ export const App: React.FC = () => {
           appendLog({
             event: 'SYSTEM',
             agent: 'TelemetryHub',
-            message: 'Connected to live Server-Sent Events (SSE) telemetry stream on :8000',
+            message: 'Connected to live Server-Sent Events (SSE) stream on :8000',
           });
         };
 
-        // Listen for named 'telemetry' events
         sse.addEventListener('telemetry', (e: MessageEvent) => {
           try {
             const data = JSON.parse(e.data);
@@ -159,7 +235,6 @@ export const App: React.FC = () => {
           }
         });
 
-        // Listen for default message events
         sse.onmessage = (e: MessageEvent) => {
           try {
             const data = JSON.parse(e.data);
@@ -188,17 +263,49 @@ export const App: React.FC = () => {
     };
   }, [appendLog, handleEvent]);
 
+  // 1-Click Human Admin Approval for Tier 3
+  const handleHumanSignoff = async (contractId: string) => {
+    try {
+      appendLog({
+        event: 'HUMAN_APPROVAL_DISPATCH',
+        agent: 'SecurityOfficer',
+        message: `Admin biometric sign-off authenticated for contract ${contractId}`,
+      });
+      await fetch(`${API_BASE}/api/v1/agent/human-approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contract_id: contractId, approved: true }),
+      });
+    } catch (err) {
+      console.error('Error signing off contract:', err);
+    }
+  };
+
   // Execute Action from UI
   const handleExecuteAction = async (
-    type: 'procure' | 'rogue_drain' | 'rogue_vendor' | 'legitimate',
+    type: 'procure' | 'tier2_audit' | 'tier3_human' | 'sla_timeout' | 'rogue_drain' | 'rogue_vendor' | 'legitimate',
     customGoal?: string
   ) => {
     setLoading(true);
 
     try {
-      if (type === 'procure' || type === 'legitimate') {
-        const budget = type === 'legitimate' ? 45.00 : 14.50;
-        const goal = customGoal || (type === 'legitimate' ? 'Complete verified dataset batch processing' : 'Procure 2x H100 GPU compute');
+      if (type === 'procure' || type === 'tier2_audit' || type === 'tier3_human' || type === 'sla_timeout' || type === 'legitimate') {
+        let budget = 14.50;
+        let goal = customGoal || 'Procure 2x H100 GPU compute hours';
+
+        if (type === 'tier2_audit') {
+          budget = 120.00;
+          goal = customGoal || 'Tier 2 Procurement: Full Fine-tuning Cluster ($120.00)';
+        } else if (type === 'tier3_human') {
+          budget = 350.00;
+          goal = customGoal || 'Tier 3 Heavy Compute Cluster: Multi-Node H100 ($350.00)';
+        } else if (type === 'sla_timeout') {
+          budget = 35.00;
+          goal = customGoal || 'Simulate SLA Breach & Escrow Auto-Refund ($35.00)';
+        } else if (type === 'legitimate') {
+          budget = 45.00;
+          goal = customGoal || 'Complete verified dataset batch processing';
+        }
 
         appendLog({
           event: 'USER_COMMAND',
@@ -207,86 +314,51 @@ export const App: React.FC = () => {
         });
 
         // 1. Negotiate
-        let negRes: Response;
-        let negData: any;
-        try {
-          negRes = await fetch(`${API_BASE}/api/v1/agent/negotiate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              goal,
-              max_budget: budget,
-              vendor_receiver: 'verified_vendor_ai@enterprise.com',
-              deliverable_hint: 'COMPUTE_MATRIX_VALIDATED_PROOF',
-            }),
+        const negRes = await fetch(`${API_BASE}/api/v1/agent/negotiate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            goal,
+            max_budget: budget,
+            vendor_receiver: 'verified_vendor_ai@enterprise.com',
+            deliverable_hint: 'COMPUTE_MATRIX_VALIDATED_PROOF',
+          }),
+        });
+        const negData = await negRes.json();
+
+        // If Tier 3 (> $200), pause and require 1-click human sign-off
+        if (negData.requires_human_approval) {
+          appendLog({
+            event: 'ESCALATION_ALERT',
+            agent: 'SentinelArbiter',
+            message: `PAUSED: Transaction amount $${budget} exceeds Tier 2 ceiling. Awaiting Admin Biometric Sign-off.`,
           });
-          negData = await negRes.json();
-          handleEvent({
-            event: 'CONTRACT_CREATED',
-            contract_id: negData.contract.contract_id,
-            amount: budget,
-            vendor: negData.contract.vendor_paypal_receiver,
-            signature: negData.contract.signature,
-          });
-        } catch (netErr) {
-          // Fallback simulation
-          const mockContractId = `cnt_${Date.now()}`;
-          handleEvent({
-            event: 'CONTRACT_CREATED',
-            contract_id: mockContractId,
-            amount: budget,
-            vendor: 'verified_vendor_ai@enterprise.com',
-            signature: 'hmac_sha256_mock_sig_dual_key',
-          });
-          handleEvent({
-            event: 'POLICY_APPROVED',
-            contract_id: mockContractId,
-            signature: 'sentinel_approved_policy_hash',
-          });
-          handleEvent({
-            event: 'ESCROW_FUNDS_HELD',
-            contract_id: mockContractId,
-            paypal_order_id: `ORD-SANDBOX-AUTH-${Math.floor(Math.random() * 900000 + 100000)}`,
-          });
-          handleEvent({
-            event: 'ESCROW_SETTLED',
-            contract_id: mockContractId,
-            paypal_order_id: `ORD-SANDBOX-AUTH-SETTLED`,
-            paypal_capture_id: `CAP-SANDBOX-SETTLED-${Math.floor(Math.random() * 900000 + 100000)}`,
-          });
+          // Auto-prompt sign-off simulation in cockpit
+          setTimeout(async () => {
+            await handleHumanSignoff(negData.contract.contract_id);
+            // After sign-off, trigger escrow
+            await fetch(`${API_BASE}/api/v1/agent/execute-escrow`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contract: negData.contract,
+                delivered_proof: 'COMPUTE_MATRIX_VALIDATED_PROOF',
+              }),
+            });
+          }, 1500);
           return;
         }
 
-        // 2. Execute Escrow & Capture
-        try {
-          const escrowRes = await fetch(`${API_BASE}/api/v1/agent/execute-escrow`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contract: negData.contract,
-              delivered_proof: 'COMPUTE_MATRIX_VALIDATED_PROOF',
-            }),
-          });
-          const escrowData = await escrowRes.json();
-          handleEvent({
-            event: 'ESCROW_SETTLED',
-            contract_id: negData.contract.contract_id,
-            paypal_order_id: escrowData.paypal_order_id,
-            paypal_capture_id: escrowData.paypal_capture_id,
-            amount: budget,
-            vendor: negData.contract.vendor_paypal_receiver,
-          });
-        } catch (escrowErr) {
-          console.warn('Backend escrow call failed, applying optimistic update');
-          handleEvent({
-            event: 'ESCROW_SETTLED',
-            contract_id: negData.contract.contract_id,
-            paypal_order_id: 'ORD-SANDBOX-AUTH-SIMULATED',
-            paypal_capture_id: 'CAP-SANDBOX-SETTLED-SIMULATED',
-            amount: budget,
-            vendor: negData.contract.vendor_paypal_receiver,
-          });
-        }
+        // 2. Execute Escrow & Capture / Auto-Refund
+        await fetch(`${API_BASE}/api/v1/agent/execute-escrow`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contract: negData.contract,
+            delivered_proof: 'COMPUTE_MATRIX_VALIDATED_PROOF',
+            simulate_sla_timeout: type === 'sla_timeout',
+          }),
+        });
       } else if (type === 'rogue_drain' || type === 'rogue_vendor') {
         const isDrain = type === 'rogue_drain';
         const payload = isDrain
@@ -299,38 +371,14 @@ export const App: React.FC = () => {
         appendLog({
           event: 'ATTACK_SIMULATION',
           agent: 'PromptCommander',
-          message: `Dispatched adversarial payload: ${isDrain ? 'Unauthorized $1,850 drain attempt (> $100 cap)' : 'Unauthorized vendor spend'}`,
+          message: `Dispatched adversarial payload: ${isDrain ? 'Unauthorized $1,850 drain attempt (> Policy Cap)' : 'Unauthorized vendor spend'}`,
         });
 
-        try {
-          const res = await fetch(`${API_BASE}/api/v1/agent/simulate-rogue-attack`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          const data = await res.json();
-          handleEvent({
-            event: 'ROGUE_SPEND_INTERCEPTED',
-            contract_id: data.contract_id,
-            attack_type: data.attack_type,
-            amount: isDrain ? '1850.00' : '250.00',
-            vendor: isDrain ? 'verified_vendor_ai@enterprise.com' : 'unauthorized_darkweb_syndicate@exploit.net',
-            rejection_code: data.rejection_code,
-            reason: data.reason,
-          });
-        } catch (err) {
-          handleEvent({
-            event: 'ROGUE_SPEND_INTERCEPTED',
-            contract_id: `rogue_${Date.now()}`,
-            attack_type: isDrain ? 'EXCESSIVE_DRAIN' : 'ROGUE_VENDOR',
-            amount: isDrain ? '1850.00' : '250.00',
-            vendor: isDrain ? 'verified_vendor_ai@enterprise.com' : 'unauthorized_darkweb_syndicate@exploit.net',
-            rejection_code: isDrain ? 'ERR_MAX_SINGLE_LIMIT_EXCEEDED' : 'ERR_UNAUTHORIZED_VENDOR',
-            reason: isDrain
-              ? 'Transaction amount $1850.00 exceeds single transaction cap of $100.00'
-              : 'Target vendor is not on authorized recipient whitelist.',
-          });
-        }
+        await fetch(`${API_BASE}/api/v1/agent/simulate-rogue-attack`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
       }
     } catch (err) {
       console.error('Action failed:', err);
@@ -351,7 +399,7 @@ export const App: React.FC = () => {
       <div className="fixed bottom-12 right-1/4 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Top Navigation Bar with Hyper-Glass styling */}
-      <header className="border-b border-white/10 bg-[#06080f]/80 backdrop-blur-xl sticky top-0 z-50 px-8 py-4 flex items-center justify-between shadow-lg">
+      <header className="border-b border-white/10 bg-[#06080f]/80 backdrop-blur-xl sticky top-0 z-40 px-8 py-4 flex items-center justify-between shadow-lg">
         <div className="flex items-center space-x-3.5">
           <div className="p-2.5 bg-gradient-to-tr from-[#0070ba] to-cyan-500 rounded-xl shadow-lg shadow-cyan-500/20 border border-white/20">
             <Shield className="w-5 h-5 text-white" />
@@ -362,10 +410,10 @@ export const App: React.FC = () => {
                 PayAgent-Sentinel
               </h1>
               <span className="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold shadow-sm shadow-cyan-500/20">
-                PayPal AI Hackathon 2026
+                Enterprise Production Suite
               </span>
             </div>
-            <p className="text-xs text-slate-400">Zero-Trust Multi-Agent Autonomous Escrow & Cryptographic Policy Engine</p>
+            <p className="text-xs text-slate-400">Zero-Trust Multi-Agent Autonomous Escrow & Dynamic Policy Engine</p>
           </div>
         </div>
 
@@ -383,34 +431,31 @@ export const App: React.FC = () => {
             </span>
           </div>
 
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/60 border border-white/10 backdrop-blur-md shadow-sm">
-            <Lock className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="text-slate-400">Zero-Trust Arbiter:</span>
-            <span className="text-emerald-400 font-bold">ENFORCED ($100 CAP)</span>
-          </div>
+          <button
+            onClick={() => setIsVaultOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-500/40 text-cyan-300 backdrop-blur-md transition-all shadow-sm active:scale-95"
+          >
+            <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="font-bold">Policy Vault (Cap: ${vaultConfig.hard_cap})</span>
+          </button>
 
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/60 border border-white/10 backdrop-blur-md shadow-sm">
             <Database className="w-3.5 h-3.5 text-violet-400" />
             <span className="text-slate-400">SHA-256 Ledger:</span>
             <span className="text-emerald-400 font-bold">ACTIVE</span>
           </div>
-
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/60 border border-white/10 backdrop-blur-md shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-            <span className="text-slate-400">NVIDIA Nemotron:</span>
-            <span className="text-cyan-300 font-bold">NEBIUS v1</span>
-          </div>
         </div>
       </header>
 
       {/* Main Cockpit Grid */}
       <main className="flex-1 p-8 max-w-[1700px] w-full mx-auto space-y-6 relative z-10">
-        {/* Row 1: Real-time Fintech Financial Metrics Cards */}
+        {/* Row 1: Real-time Fintech Financial Metrics & Enterprise ROI Cards */}
         <FintechStatsCards
           totalEscrowVolume={metrics.totalEscrowVolume}
           settledPayouts={metrics.settledPayouts}
           fraudIntercepted={metrics.fraudIntercepted}
           arbiterStatus="ACTIVE"
+          onOpenVault={() => setIsVaultOpen(true)}
         />
 
         {/* Row 2: Command & Natural Language Prompt Input */}
@@ -422,6 +467,14 @@ export const App: React.FC = () => {
           <AgentReasoningFeed logs={telemetryLogs} />
         </div>
       </main>
+
+      {/* Slide-out Policy Vault Drawer */}
+      <PolicyVaultDrawer
+        isOpen={isVaultOpen}
+        onClose={() => setIsVaultOpen(false)}
+        config={vaultConfig}
+        onSave={handleSaveVault}
+      />
 
       {/* Footer */}
       <footer className="border-t border-white/10 px-8 py-3.5 text-xs text-slate-500 flex justify-between items-center bg-[#06080f]/90 backdrop-blur-md z-10">

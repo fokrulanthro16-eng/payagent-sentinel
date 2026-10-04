@@ -13,7 +13,7 @@ export interface LedgerRowData {
   paypalOrderId: string;
   paypalCaptureId?: string;
   riskScore: number;
-  status: 'SETTLED' | 'BLOCKED' | 'ESCROW_HELD' | 'NEGOTIATED';
+  status: 'SETTLED' | 'BLOCKED' | 'ESCROW_HELD' | 'NEGOTIATED' | 'REFUNDED' | 'PENDING_HUMAN_APPROVAL';
 }
 
 interface AGGridLedgerProps {
@@ -140,14 +140,28 @@ export const AGGridLedger: React.FC<AGGridLedgerProps> = ({ rowData }) => {
         const status = params.value;
         if (status === 'SETTLED') {
           return (
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold bg-emerald-950/60 text-emerald-300 border border-emerald-500/50 shadow-sm shadow-emerald-500/20">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-950/60 text-emerald-300 border border-emerald-500/50 shadow-sm shadow-emerald-500/20">
               <CheckCircle2 className="w-3 h-3 text-emerald-400" /> CAPTURED
+            </span>
+          );
+        }
+        if (status === 'REFUNDED') {
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-orange-950/60 text-orange-300 border border-orange-500/50 shadow-sm shadow-orange-500/20">
+              REFUNDED
+            </span>
+          );
+        }
+        if (status === 'PENDING_HUMAN_APPROVAL') {
+          return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-950/60 text-amber-300 border border-amber-500/50 animate-pulse">
+              HUMAN SIGN-OFF
             </span>
           );
         }
         if (status === 'BLOCKED') {
           return (
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold bg-rose-950/60 text-rose-300 border border-rose-500/50 shadow-sm shadow-rose-500/20">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-950/60 text-rose-300 border border-rose-500/50 shadow-sm shadow-rose-500/20">
               BLOCKED
             </span>
           );

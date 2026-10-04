@@ -272,6 +272,52 @@ class PayPalGateway:
         except httpx.RequestError as exc:
             raise PayPalAPIError(f"Network error executing payout: {str(exc)}") from exc
 
+    async def void_escrow_order(self, order_id: str) -> Dict[str, Any]:
+        """Void an authorized PayPal escrow hold upon SLA breach or timeout."""
+        if self.is_simulation_mode and self._http_client is None:
+            return {
+                "id": order_id,
+                "status": "VOIDED",
+                "void_time": datetime.now(timezone.utc).isoformat(),
+                "reason": "SLA_BREACH_TIMEOUT",
+            }
+
+        url = f"{self.settings.paypal_base_url}/v2/checkout/orders/{order_id}/void"
+        headers = await self._get_auth_headers()
+        client = await self._get_client()
+        try:
+            response = await client.post(url, headers=headers)
+            if response.status_code not in (200, 204):
+                raise PayPalAPIError(f"Void failed: {response.status_code} - {response.text}", status_code=response.status_code)
+            return {"id": order_id, "status": "VOIDED"}
+        except httpx.RequestError as exc:
+            raise PayPalAPIError(f"Network error voiding order: {str(exc)}") from exc
+
+    async def refund_buyer(self, capture_or_order_id: str, note: str = "SLA Verification Failed: Auto-Refund") -> Dict[str, Any]:
+        """Execute automated refund to buyer wallet when SLA proof fails or expires."""
+        refund_id = f"REFUND-SANDBOX-{uuid.uuid4().hex[:8].upper()}"
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        if self.is_simulation_mode and self._http_client is None:
+            return {
+                "id": refund_id,
+                "status": "COMPLETED",
+                "create_time": now_iso,
+                "note_to_payer": note,
+                "links": [{"href": f"https://api-m.sandbox.paypal.com/v2/payments/refunds/{refund_id}", "rel": "self", "method": "GET"}],
+            }
+
+        url = f"{self.settings.paypal_base_url}/v2/payments/captures/{capture_or_order_id}/refund"
+        headers = await self._get_auth_headers()
+        client = await self._get_client()
+        try:
+            response = await client.post(url, headers=headers, json={"note_to_payer": note})
+            if response.status_code not in (200, 201):
+                raise PayPalAPIError(f"Refund failed: {response.status_code} - {response.text}", status_code=response.status_code)
+            return response.json()
+        except httpx.RequestError as exc:
+            raise PayPalAPIError(f"Network error refunding capture: {str(exc)}") from exc
+
     async def close(self):
         """Close HTTP client session."""
         if self._http_client and not self._http_client.is_closed:

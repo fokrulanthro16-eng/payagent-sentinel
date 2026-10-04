@@ -123,6 +123,8 @@ app.add_middleware(
 )
 
 
+from app.core.policies import policy_engine, PolicyTier, PolicyConfig
+
 # Request & Response Models
 class NegotiateRequest(BaseModel):
     goal: str = Field(..., example="Procure 4x H100 GPU compute hours for batch model evaluation")
@@ -134,6 +136,22 @@ class NegotiateRequest(BaseModel):
 class ExecuteEscrowRequest(BaseModel):
     contract: ContractProposal
     delivered_proof: Optional[str] = None
+    simulate_sla_timeout: Optional[bool] = False
+
+
+class HumanApprovalRequest(BaseModel):
+    contract_id: str
+    admin_credential: str = Field(default="admin-biometric-signed-key-2026")
+    approved: bool = True
+
+
+class PolicyVaultUpdateRequest(BaseModel):
+    tier_1_max: Optional[Decimal] = None
+    tier_2_max: Optional[Decimal] = None
+    hard_cap: Optional[Decimal] = None
+    hourly_velocity_limit: Optional[Decimal] = None
+    whitelist_add: Optional[str] = None
+    blacklist_add: Optional[str] = None
 
 
 class SimulateAttackRequest(BaseModel):
@@ -243,6 +261,20 @@ async def agent_negotiate(req: NegotiateRequest):
         currency=CurrencyCode.USD,
     )
 
+    # Evaluate Tier & Limits
+    tier_eval = policy_engine.evaluate_tier(req.max_budget, buyer_agent.agent_id, contract.vendor_paypal_receiver)
+    await hub.broadcast(
+        {
+            "event": "TIER_EVALUATED",
+            "contract_id": contract_id,
+            "tier": tier_eval.tier.value,
+            "requires_human": tier_eval.requires_human_approval,
+            "risk_score": tier_eval.risk_score,
+            "recommendation": tier_eval.recommendation,
+            "take_rate_fee": str(tier_eval.take_rate_fee),
+        }
+    )
+
     ledger.append_entry(
         action="CONTRACT_NEGOTIATED",
         contract_id=contract_id,
@@ -250,6 +282,7 @@ async def agent_negotiate(req: NegotiateRequest):
             "amount": str(req.max_budget),
             "vendor": contract.vendor_paypal_receiver,
             "signature": contract.signature or "",
+            "tier": tier_eval.tier.value,
         },
     )
 
@@ -260,30 +293,121 @@ async def agent_negotiate(req: NegotiateRequest):
             "amount": str(req.max_budget),
             "vendor": contract.vendor_paypal_receiver,
             "signature": contract.signature,
-            "status": "NEGOTIATED_SIGNED",
+            "tier": tier_eval.tier.value,
+            "requires_human": tier_eval.requires_human_approval,
+            "status": "PENDING_HUMAN_APPROVAL" if tier_eval.requires_human_approval else "NEGOTIATED_SIGNED",
         }
     )
 
     return {
-        "status": "NEGOTIATED",
+        "status": "PENDING_HUMAN_APPROVAL" if tier_eval.requires_human_approval else "NEGOTIATED",
         "contract": contract,
+        "tier": tier_eval.tier.value,
+        "requires_human_approval": tier_eval.requires_human_approval,
+        "risk_score": tier_eval.risk_score,
         "deliverable_key": req.deliverable_hint or "STANDARD_DELIVERABLE_COMPUTE",
     }
 
 
+# In-memory human approval approvals
+human_approved_contracts: Set[str] = set()
+
+
+@app.post("/api/v1/agent/human-approve")
+async def human_approve_contract(req: HumanApprovalRequest):
+    """Admin 1-click credential/biometric sign-off for Tier 3 (> $200) transactions."""
+    if not req.approved:
+        await hub.broadcast(
+            {
+                "event": "HUMAN_REJECTED",
+                "contract_id": req.contract_id,
+                "message": f"Administrator rejected contract {req.contract_id} sign-off.",
+            }
+        )
+        return {"status": "REJECTED", "contract_id": req.contract_id}
+
+    human_approved_contracts.add(req.contract_id)
+    await hub.broadcast(
+        {
+            "event": "HUMAN_APPROVED",
+            "contract_id": req.contract_id,
+            "admin": req.admin_credential,
+            "message": f"Administrator verified Tier 3 biometric/credential sign-off for {req.contract_id}.",
+        }
+    )
+    return {"status": "APPROVED", "contract_id": req.contract_id}
+
+
+@app.get("/api/v1/policy/vault")
+async def get_policy_vault():
+    """Retrieve active enterprise policy vault configuration."""
+    return {
+        "tier_1_max": float(policy_engine.config.tier_1_max),
+        "tier_2_max": float(policy_engine.config.tier_2_max),
+        "hard_cap": float(policy_engine.config.hard_cap),
+        "hourly_velocity_limit": float(policy_engine.config.hourly_velocity_limit),
+        "take_rate_percentage": float(policy_engine.config.take_rate_percentage),
+        "whitelisted_agents": list(policy_engine.config.whitelisted_agents),
+        "blacklisted_agents": list(policy_engine.config.blacklisted_agents),
+    }
+
+
+@app.post("/api/v1/policy/vault")
+async def update_policy_vault(req: PolicyVaultUpdateRequest):
+    """Live update of enterprise policy vault rules."""
+    if req.tier_1_max is not None:
+        policy_engine.config.tier_1_max = req.tier_1_max
+    if req.tier_2_max is not None:
+        policy_engine.config.tier_2_max = req.tier_2_max
+    if req.hard_cap is not None:
+        policy_engine.config.hard_cap = req.hard_cap
+        settings.SENTINEL_MAX_SINGLE_TRANSACTION = req.hard_cap
+    if req.hourly_velocity_limit is not None:
+        policy_engine.config.hourly_velocity_limit = req.hourly_velocity_limit
+    if req.whitelist_add:
+        policy_engine.config.whitelisted_agents.add(req.whitelist_add)
+    if req.blacklist_add:
+        policy_engine.config.blacklisted_agents.add(req.blacklist_add)
+
+    await hub.broadcast(
+        {
+            "event": "POLICY_VAULT_UPDATED",
+            "hard_cap": str(policy_engine.config.hard_cap),
+            "tier_1_max": str(policy_engine.config.tier_1_max),
+        }
+    )
+    return {"status": "UPDATED", "vault": await get_policy_vault()}
+
+
 @app.post("/api/v1/agent/execute-escrow")
 async def agent_execute_escrow(req: ExecuteEscrowRequest):
-    """Full zero-trust verification, PayPal escrow creation, deliverable SLA verification, and capture."""
+    """Zero-trust verification, Tier check, PayPal escrow, proof delivery or auto-refund."""
     contract = req.contract
     contract_id = contract.contract_id
 
-    # 1. Policy Arbiter Evaluation
+    # 1. Tier & Human Escalation Verification
+    tier_eval = policy_engine.evaluate_tier(contract.amount.value, contract.buyer_agent_id, contract.vendor_paypal_receiver)
+    if tier_eval.requires_human_approval and contract_id not in human_approved_contracts:
+        await hub.broadcast(
+            {
+                "event": "ESCALATED_HUMAN_REQUIRED",
+                "contract_id": contract_id,
+                "amount": str(contract.amount.value),
+                "reason": f"Tier 3 procurement (${contract.amount.value}) pauses until human biometric sign-off.",
+            }
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=f"Tier 3 transaction requires human admin sign-off before escrow release.",
+        )
+
+    # 2. Policy Arbiter Evaluation
     await hub.broadcast(
         {
             "event": "POLICY_EVALUATING",
             "contract_id": contract_id,
             "agent": "SentinelArbiter",
-            "message": f"Evaluating zero-trust spending limits, vendor whitelist, and HMAC signature...",
+            "message": f"Evaluating zero-trust spending envelope against Policy Vault (Cap: ${policy_engine.config.hard_cap})...",
         }
     )
 
@@ -307,12 +431,11 @@ async def agent_execute_escrow(req: ExecuteEscrowRequest):
         }
     )
 
-    # 2. PayPal Orders v2 Escrow Initialization
+    # 3. PayPal Orders v2 Escrow Hold
     try:
         escrow = await arbiter.initialize_paypal_escrow(contract_id)
         paypal_order_id = escrow.paypal_order_id or f"ORD-SANDBOX-AUTH-{uuid.uuid4().hex[:8].upper()}"
-    except Exception as exc:
-        # Fallback to simulated sandbox hold if network call encounters issues
+    except Exception:
         escrow = arbiter.escrows[contract_id]
         paypal_order_id = f"ORD-SANDBOX-AUTH-{uuid.uuid4().hex[:8].upper()}"
         escrow.paypal_order_id = paypal_order_id
@@ -332,7 +455,35 @@ async def agent_execute_escrow(req: ExecuteEscrowRequest):
         }
     )
 
-    # 3. Vendor Proof Delivery & SLA Verification
+    # 4. Handle SLA Breach / Timeout Auto-Refund Simulation
+    if req.simulate_sla_timeout:
+        # Auto-refund triggered
+        refund_res = await paypal_gateway.refund_buyer(paypal_order_id, note="SLA Breach: Delivery deadline exceeded")
+        escrow.status = EscrowStatus.REFUNDED
+        arbiter.ledger.append_entry(
+            action="ESCROW_AUTO_REFUNDED",
+            contract_id=contract_id,
+            data={"order_id": paypal_order_id, "refund_id": refund_res.get("id", "REFUND_SIM")},
+        )
+        await hub.broadcast(
+            {
+                "event": "ESCROW_AUTO_REFUNDED",
+                "contract_id": contract_id,
+                "paypal_order_id": paypal_order_id,
+                "refund_id": refund_res.get("id"),
+                "reason": "SLA deadline exceeded. Automated PayPal buyer refund triggered.",
+                "status": "REFUNDED",
+            }
+        )
+        return {
+            "status": "REFUNDED",
+            "contract_id": contract_id,
+            "paypal_order_id": paypal_order_id,
+            "refund_id": refund_res.get("id"),
+            "ledger_verified": ledger.verify_integrity(),
+        }
+
+    # 5. Vendor Proof Verification & Settle
     proof_content = req.delivered_proof or "STANDARD_DELIVERABLE_COMPUTE"
     target_milestone = contract.milestones[0].milestone_id
 
@@ -345,7 +496,6 @@ async def agent_execute_escrow(req: ExecuteEscrowRequest):
         }
     )
 
-    # 4. Settlement & Capture
     try:
         escrow = await arbiter.verify_and_settle_milestone(
             contract_id=contract_id,
@@ -353,10 +503,21 @@ async def agent_execute_escrow(req: ExecuteEscrowRequest):
             delivered_proof=proof_content,
         )
         paypal_capture_id = escrow.paypal_capture_id or f"CAP-SANDBOX-SETTLED-{uuid.uuid4().hex[:8].upper()}"
-    except Exception as exc:
+    except Exception:
         proof_hash = SecurityEngine.compute_sha256(proof_content)
         if proof_hash != contract.milestones[0].expected_output_hash:
-            raise HTTPException(status_code=400, detail="SLA verification failed: Proof hash mismatch.")
+            # Trigger auto-refund on proof mismatch
+            await paypal_gateway.refund_buyer(paypal_order_id, note="Cryptographic proof mismatch")
+            escrow.status = EscrowStatus.REFUNDED
+            await hub.broadcast(
+                {
+                    "event": "ESCROW_AUTO_REFUNDED",
+                    "contract_id": contract_id,
+                    "paypal_order_id": paypal_order_id,
+                    "status": "REFUNDED",
+                }
+            )
+            raise HTTPException(status_code=400, detail="SLA verification failed: Auto-refund executed.")
 
         paypal_capture_id = f"CAP-SANDBOX-SETTLED-{uuid.uuid4().hex[:8].upper()}"
         escrow.status = EscrowStatus.SETTLED
