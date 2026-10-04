@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PromptCommander } from './components/PromptCommander';
 import { AGGridLedger } from './components/AGGridLedger';
 import type { LedgerRowData } from './components/AGGridLedger';
 import { AgentReasoningFeed } from './components/AgentReasoningFeed';
 import type { TelemetryLog } from './components/AgentReasoningFeed';
+import { FintechStatsCards } from './components/FintechStatsCards';
 import { Shield, Lock, Database, Wifi, WifiOff, Sparkles } from 'lucide-react';
 
 const API_BASE = 'http://127.0.0.1:8000';
@@ -13,6 +14,26 @@ export const App: React.FC = () => {
   const [ledgerRows, setLedgerRows] = useState<LedgerRowData[]>([]);
   const [telemetryLogs, setTelemetryLogs] = useState<TelemetryLog[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+
+  // Dynamic Fintech Metric Calculations
+  const metrics = useMemo(() => {
+    let totalEscrowVolume = 0;
+    let settledPayouts = 0;
+    let fraudIntercepted = 0;
+
+    for (const row of ledgerRows) {
+      if (row.status === 'SETTLED') {
+        settledPayouts += row.amount;
+        totalEscrowVolume += row.amount;
+      } else if (row.status === 'ESCROW_HELD' || row.status === 'NEGOTIATED') {
+        totalEscrowVolume += row.amount;
+      } else if (row.status === 'BLOCKED' || row.policyDecision === 'INTERCEPTED') {
+        fraudIntercepted += row.amount;
+      }
+    }
+
+    return { totalEscrowVolume, settledPayouts, fraudIntercepted };
+  }, [ledgerRows]);
 
   // Append reasoning log safely
   const appendLog = useCallback((logItem: Partial<TelemetryLog>) => {
@@ -87,6 +108,7 @@ export const App: React.FC = () => {
             ? {
                 ...r,
                 paypalOrderId: event.paypal_order_id || r.paypalOrderId,
+                paypalCaptureId: event.paypal_capture_id,
                 status: 'SETTLED',
                 action: 'PAYPAL_CAPTURED',
               }
@@ -207,7 +229,7 @@ export const App: React.FC = () => {
             signature: negData.contract.signature,
           });
         } catch (netErr) {
-          // Direct fallback simulation to ensure UI responsiveness if offline
+          // Fallback simulation
           const mockContractId = `cnt_${Date.now()}`;
           handleEvent({
             event: 'CONTRACT_CREATED',
@@ -255,7 +277,7 @@ export const App: React.FC = () => {
             vendor: negData.contract.vendor_paypal_receiver,
           });
         } catch (escrowErr) {
-          console.warn('Backend escrow network call failed, applying optimistic update');
+          console.warn('Backend escrow call failed, applying optimistic update');
           handleEvent({
             event: 'ESCROW_SETTLED',
             contract_id: negData.contract.contract_id,
@@ -375,18 +397,26 @@ export const App: React.FC = () => {
 
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/60 border border-white/10 backdrop-blur-md shadow-sm">
             <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-            <span className="text-slate-400">PayPal REST:</span>
-            <span className="text-cyan-300 font-bold">SANDBOX v2</span>
+            <span className="text-slate-400">NVIDIA Nemotron:</span>
+            <span className="text-cyan-300 font-bold">NEBIUS v1</span>
           </div>
         </div>
       </header>
 
       {/* Main Cockpit Grid */}
       <main className="flex-1 p-8 max-w-[1700px] w-full mx-auto space-y-6 relative z-10">
-        {/* Row 1: Command & Natural Language Prompt Input */}
+        {/* Row 1: Real-time Fintech Financial Metrics Cards */}
+        <FintechStatsCards
+          totalEscrowVolume={metrics.totalEscrowVolume}
+          settledPayouts={metrics.settledPayouts}
+          fraudIntercepted={metrics.fraudIntercepted}
+          arbiterStatus="ACTIVE"
+        />
+
+        {/* Row 2: Command & Natural Language Prompt Input */}
         <PromptCommander onExecute={handleExecuteAction} loading={loading} />
 
-        {/* Row 2: Dual Grid Layout (Hyper-Glass AG Grid Ledger + Live Reasoning Terminal) */}
+        {/* Row 3: Dual Grid Layout (Hyper-Glass AG Grid Ledger + Live Reasoning Terminal) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <AGGridLedger rowData={ledgerRows} />
           <AgentReasoningFeed logs={telemetryLogs} />
@@ -397,7 +427,7 @@ export const App: React.FC = () => {
       <footer className="border-t border-white/10 px-8 py-3.5 text-xs text-slate-500 flex justify-between items-center bg-[#06080f]/90 backdrop-blur-md z-10">
         <div className="flex items-center gap-2">
           <span>PayAgent-Sentinel &bull; Zero-Trust Multi-Agent Autonomous Escrow</span>
-          <span className="text-cyan-400/80">&bull; Gemini 2.5 Flash + Nebius Token Factory</span>
+          <span className="text-cyan-400/80">&bull; NVIDIA Nemotron via Nebius Token Factory</span>
         </div>
         <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400">
           <span>Target Tracks: Best Use of Agentic Commerce ($5,000) &bull; Best Use of PayPal + AI ($5,000)</span>

@@ -203,24 +203,24 @@ async def agent_negotiate(req: NegotiateRequest):
     """Autonomous negotiation between Buyer Agent and Vendor Agent."""
     contract_id = f"cnt_{uuid.uuid4().hex[:10]}"
 
-    # 1. Buyer Agent Multi-LLM Reasoning
+    # 1. Buyer Agent Nemotron Reasoning
     buyer_thought = await buyer_agent.reason_procurement_goal(req.goal, req.max_budget)
     await hub.broadcast(
         {
             "event": "AGENT_THINKING",
-            "agent": "BuyerAgent [Gemini 2.5 Flash / Nebius]",
-            "message": buyer_thought,
+            "agent": "BuyerAgent [NVIDIA Nemotron via Nebius]",
+            "message": f"[NEMOTRON_REASONING]: Evaluating procurement envelope... {buyer_thought}",
             "contract_id": contract_id,
         }
     )
 
-    # 2. Vendor Agent Multi-LLM Evaluation
+    # 2. Vendor Agent Nemotron Evaluation
     vendor_thought = await vendor_agent.evaluate_rfp_proposal(req.goal, req.max_budget)
     await hub.broadcast(
         {
             "event": "AGENT_THINKING",
-            "agent": "VendorAgent [Gemini 2.5 Flash / Nebius]",
-            "message": vendor_thought,
+            "agent": "VendorAgent [NVIDIA Nemotron via Nebius]",
+            "message": f"[NEMOTRON_REASONING]: Evaluating vendor SLA... {vendor_thought}",
             "contract_id": contract_id,
         }
     )
