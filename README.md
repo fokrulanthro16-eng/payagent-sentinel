@@ -35,51 +35,19 @@ Handing an autonomous agent a static credit card or hot wallet is an open invita
 ## System Architecture
 
 ```mermaid
-flowchart TD
-    subgraph Enterprise ["Enterprise Procurement Layer"]
-        User["Business Operator / ERP Goal"] -->|"Intent Prompt"| Buyer["Buyer Agent (Gemini 2.5 Flash / Nemotron)"]
-    end
-
-    subgraph Bilateral ["Bilateral SLA Negotiation"]
-        Buyer <-->|"Bilateral RFP and Terms"| Vendor["Vendor Agent (NVIDIA Nemotron via Nebius)"]
-        Vendor -->|"Signed Contract Proposal"| Arbiter["Sentinel Zero-Trust Arbiter"]
-    end
-
-    subgraph Governance ["Dynamic Policy Governance"]
-        Arbiter -->|"1. Rules & Velocity Check"| Vault["Enterprise Policy Vault"]
-        Arbiter -->|"2. Spend Evaluation"| Tier{"Tier Assessment"}
-        Tier -->|"Tier 1 (<= $50)"| AutoApprove["Autonomous Immediate Escrow"]
-        Tier -->|"Tier 2 ($50 - $200)"| DeepAudit["Deep Milestone Verification"]
-        Tier -->|"Tier 3 (> $200)"| HumanAdmin["Pending 1-Click Approval"]
-        Tier -->|"Policy Breach"| Intercept["DETERMINISTIC INTERCEPTION"]
-    end
-
-    subgraph PayPalEscrow ["PayPal REST API v2 Escrow"]
-        AutoApprove -->|"POST Orders Authorize"| PPHold["PayPal Escrow Hold (Funds Locked)"]
-        DeepAudit -->|"POST Orders Authorize"| PPHold
-        HumanAdmin -->|"Admin Signed"| PPHold
-    end
-
-    subgraph Verification ["Cryptographic SLA Verification"]
-        Vendor -->|"Delivers Output"| Deliverable["Compute Output / Artifact"]
-        Deliverable -->|"Compute SHA-256"| HashCheck{"Hash Verification Match?"}
-        HashCheck -->|"Valid Proof"| Capture["POST Orders Capture"]
-        HashCheck -->|"Timeout / Fake Hash"| Refund["Automated Buyer Refund (Void)"]
-    end
-
-    subgraph Settlement ["Settlement & Audit Ledger"]
-        Capture -->|"PayPal Release (3.5% Take-Rate)"| VendorWallet["Vendor PayPal Payout"]
-        Capture -->|"Block Recorded"| Ledger[("SHA-256 Audit Ledger")]
-        Refund -->|"Refund Recorded"| Ledger
-        Intercept -->|"Fraud Block Logged"| Ledger
-        Ledger --> AGGrid["AG Grid Hyper-Glass Cockpit"]
-    end
-
-    style Arbiter fill:#003087,stroke:#0070ba,stroke-width:2px,color:#ffffff
-    style PPHold fill:#0070ba,stroke:#00cfe8,stroke-width:2px,color:#ffffff
-    style Intercept fill:#e11d48,stroke:#f43f5e,stroke-width:2px,color:#ffffff
-    style Capture fill:#059669,stroke:#10b981,stroke-width:2px,color:#ffffff
-    style Refund fill:#ea580c,stroke:#f97316,stroke-width:2px,color:#ffffff
+graph TD
+    A[Business Operator / ERP] --> B[Buyer Agent Gemini 2.5]
+    B <--> C[Vendor Agent Nemotron]
+    C --> D[Sentinel Arbiter]
+    D --> E{Policy Vault Check}
+    E -->|Approved| F[PayPal REST v2 Escrow Lock]
+    E -->|Breach| G[Deterministic Interception Blocked]
+    F --> H{SHA-256 Deliverable Verified?}
+    H -->|Valid Proof| I[PayPal Capture 3.5% Take-Rate]
+    H -->|Timeout / Failure| J[Automated Buyer Refund]
+    I --> K[(AG Grid Audit Ledger)]
+    J --> K
+    G --> K
 ```
 
 ---
