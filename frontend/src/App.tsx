@@ -8,6 +8,7 @@ import { FintechStatsCards } from './components/FintechStatsCards';
 import { PolicyVaultDrawer } from './components/PolicyVaultDrawer';
 import type { VaultConfig } from './components/PolicyVaultDrawer';
 import { Shield, Database, Wifi, WifiOff, Sliders } from 'lucide-react';
+import { runClientSimulation } from './services/demoEngine';
 
 const API_BASE = 'http://127.0.0.1:8000';
 
@@ -15,6 +16,7 @@ const STORAGE_KEY_LEDGER = 'sentinel_ledger_rows_v2';
 
 export const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [ledgerRows, setLedgerRows] = useState<LedgerRowData[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_LEDGER);
@@ -80,18 +82,21 @@ export const App: React.FC = () => {
 
   // Load live vault config and initial ledger history if local storage is empty
   useEffect(() => {
-    fetch(`${API_BASE}/api/v1/policy/vault`)
+    fetch(`${API_BASE}/api/v1/policy/vault`, { signal: AbortSignal.timeout(2500) })
       .then((res) => res.json())
       .then((data) => {
         if (data && data.hard_cap) {
           setVaultConfig(data);
         }
       })
-      .catch((err) => console.warn('Could not fetch vault config:', err));
+      .catch((err) => {
+        console.warn('Backend vault unreachable, using autonomous demo vault configuration:', err);
+        setIsDemoMode(true);
+      });
 
     // Fetch initial history if no local storage records
     if (ledgerRows.length === 0) {
-      fetch(`${API_BASE}/api/v1/ledger/history`)
+      fetch(`${API_BASE}/api/v1/ledger/history`, { signal: AbortSignal.timeout(2500) })
         .then((res) => res.json())
         .then((blocks) => {
           if (Array.isArray(blocks) && blocks.length > 1) {
@@ -120,23 +125,68 @@ export const App: React.FC = () => {
             }
           }
         })
-        .catch((err) => console.warn('Could not fetch ledger history:', err));
+        .catch((err) => {
+          console.warn('Backend ledger unreachable, seeding pristine enterprise demo records:', err);
+          setIsDemoMode(true);
+          const demoGenesisRows: LedgerRowData[] = [
+            {
+              id: 'c_demo_tier1_init',
+              timestamp: new Date(Date.now() - 3600000).toISOString(),
+              action: 'PAYPAL_CAPTURED',
+              targetVendor: 'verified_vendor_ai@enterprise.com',
+              amount: 14.50,
+              policyDecision: 'PASSED',
+              paypalOrderId: 'PP-ORD-A79B142F80CD',
+              paypalCaptureId: 'PP-CAP-C98A210F34BE',
+              riskScore: 4,
+              status: 'SETTLED',
+            },
+            {
+              id: 'c_demo_tier2_init',
+              timestamp: new Date(Date.now() - 7200000).toISOString(),
+              action: 'PAYPAL_CAPTURED',
+              targetVendor: 'cloud_compute_agent@vendor.org',
+              amount: 120.00,
+              policyDecision: 'PASSED',
+              paypalOrderId: 'PP-ORD-D44C890E11FF',
+              paypalCaptureId: 'PP-CAP-F55A338D90AA',
+              riskScore: 18,
+              status: 'SETTLED',
+            },
+            {
+              id: 'c_demo_rogue_init',
+              timestamp: new Date(Date.now() - 10800000).toISOString(),
+              action: 'INTERCEPTED: HARD_CAP_BREACH',
+              targetVendor: 'unauthorized_darkweb_syndicate@exploit.net',
+              amount: 1850.00,
+              policyDecision: 'INTERCEPTED',
+              paypalOrderId: 'BLOCKED',
+              riskScore: 99,
+              status: 'BLOCKED',
+            },
+          ];
+          setLedgerRows(demoGenesisRows);
+        });
     }
   }, []);
 
   const handleSaveVault = async (updated: Partial<VaultConfig>) => {
+    // Optimistically update locally
+    setVaultConfig((prev) => ({ ...prev, ...updated }));
     try {
       const res = await fetch(`${API_BASE}/api/v1/policy/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
+        signal: AbortSignal.timeout(2000),
       });
       const data = await res.json();
       if (data.vault) {
         setVaultConfig(data.vault);
       }
     } catch (err) {
-      console.error('Error saving vault config:', err);
+      console.warn('Backend unavailable; vault updated in local reactive state:', err);
+      setIsDemoMode(true);
     }
   };
 
@@ -267,6 +317,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     let sse: EventSource | null = null;
     let reconnectTimeout: any = null;
+    let hasAttemptedInitial = false;
 
     const connectSSE = () => {
       try {
@@ -274,6 +325,7 @@ export const App: React.FC = () => {
 
         sse.onopen = () => {
           setIsConnected(true);
+          setIsDemoMode(false);
           appendLog({
             event: 'SYSTEM',
             agent: 'TelemetryHub',
@@ -302,11 +354,22 @@ export const App: React.FC = () => {
         sse.onerror = () => {
           setIsConnected(false);
           sse?.close();
-          reconnectTimeout = setTimeout(connectSSE, 3000);
+          if (!hasAttemptedInitial) {
+            hasAttemptedInitial = true;
+            setIsDemoMode(true);
+            appendLog({
+              event: 'SYSTEM',
+              agent: 'SentinelEngine',
+              message: 'Local backend offline. Interactive Autonomous Demo Engine initialized.',
+            });
+          }
+          // Slow reconnect backoff to avoid continuous network noise on static Vercel
+          reconnectTimeout = setTimeout(connectSSE, 15000);
         };
       } catch (err) {
         setIsConnected(false);
-        reconnectTimeout = setTimeout(connectSSE, 3000);
+        setIsDemoMode(true);
+        reconnectTimeout = setTimeout(connectSSE, 15000);
       }
     };
 
@@ -320,19 +383,32 @@ export const App: React.FC = () => {
 
   // 1-Click Human Admin Approval for Tier 3
   const handleHumanSignoff = async (contractId: string) => {
+    appendLog({
+      event: 'HUMAN_APPROVAL_DISPATCH',
+      agent: 'SecurityOfficer',
+      message: `Admin biometric sign-off authenticated for contract ${contractId}`,
+    });
+    setLedgerRows((prev) =>
+      prev.map((r) =>
+        r.id === contractId
+          ? {
+              ...r,
+              action: 'ADMIN_BIOMETRIC_SIGNED',
+              status: 'NEGOTIATED',
+              policyDecision: 'PASSED',
+            }
+          : r
+      )
+    );
     try {
-      appendLog({
-        event: 'HUMAN_APPROVAL_DISPATCH',
-        agent: 'SecurityOfficer',
-        message: `Admin biometric sign-off authenticated for contract ${contractId}`,
-      });
       await fetch(`${API_BASE}/api/v1/agent/human-approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contract_id: contractId, approved: true }),
+        signal: AbortSignal.timeout(2000),
       });
     } catch (err) {
-      console.error('Error signing off contract:', err);
+      console.warn('Backend unavailable; sign-off recorded in local engine:', err);
     }
   };
 
@@ -343,6 +419,32 @@ export const App: React.FC = () => {
     customBudget?: number
   ) => {
     setLoading(true);
+
+    // Fallback executor using client simulation engine
+    const executeFallbackSimulation = async () => {
+      setIsDemoMode(true);
+      await runClientSimulation(type, customGoal, customBudget, vaultConfig.hard_cap, {
+        onLog: (log) => appendLog(log),
+        onRowCreated: (newRow) => {
+          setLedgerRows((prev) => [newRow, ...prev.filter((r) => r.id !== newRow.id)]);
+        },
+        onRowUpdated: (rowId, patch) => {
+          setLedgerRows((prev) =>
+            prev.map((r) => (r.id === rowId ? { ...r, ...patch } : r))
+          );
+        },
+      });
+    };
+
+    // If already in demo mode, execute client simulation directly
+    if (isDemoMode) {
+      try {
+        await executeFallbackSimulation();
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       if (type === 'procure' || type === 'tier2_audit' || type === 'tier3_human' || type === 'sla_timeout' || type === 'legitimate') {
@@ -379,6 +481,7 @@ export const App: React.FC = () => {
             vendor_receiver: 'verified_vendor_ai@enterprise.com',
             deliverable_hint: 'COMPUTE_MATRIX_VALIDATED_PROOF',
           }),
+          signal: AbortSignal.timeout(3000),
         });
         const negData = await negRes.json();
 
@@ -389,10 +492,8 @@ export const App: React.FC = () => {
             agent: 'SentinelArbiter',
             message: `PAUSED: Transaction amount $${budget} exceeds Tier 2 ceiling. Awaiting Admin Biometric Sign-off.`,
           });
-          // Auto-prompt sign-off simulation in cockpit
           setTimeout(async () => {
             await handleHumanSignoff(negData.contract.contract_id);
-            // After sign-off, trigger escrow
             await fetch(`${API_BASE}/api/v1/agent/execute-escrow`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -400,6 +501,7 @@ export const App: React.FC = () => {
                 contract: negData.contract,
                 delivered_proof: 'COMPUTE_MATRIX_VALIDATED_PROOF',
               }),
+              signal: AbortSignal.timeout(4000),
             });
           }, 1500);
           return;
@@ -414,6 +516,7 @@ export const App: React.FC = () => {
             delivered_proof: 'COMPUTE_MATRIX_VALIDATED_PROOF',
             simulate_sla_timeout: type === 'sla_timeout',
           }),
+          signal: AbortSignal.timeout(4000),
         });
       } else if (type === 'rogue_drain' || type === 'rogue_vendor') {
         const isDrain = type === 'rogue_drain';
@@ -434,15 +537,12 @@ export const App: React.FC = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(3000),
         });
       }
     } catch (err) {
-      console.error('Action failed:', err);
-      appendLog({
-        event: 'ERROR',
-        agent: 'System',
-        message: `Execution failed: ${String(err)}`,
-      });
+      console.warn('Network call to backend failed. Engaging autonomous client simulation engine:', err);
+      await executeFallbackSimulation();
     } finally {
       setLoading(false);
     }
@@ -478,14 +578,14 @@ export const App: React.FC = () => {
         {/* Live System Status Badges */}
         <div className="flex items-center space-x-3.5 text-xs font-mono">
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/60 border border-white/10 backdrop-blur-md shadow-sm">
-            {isConnected ? (
+            {isConnected || isDemoMode ? (
               <Wifi className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
             ) : (
               <WifiOff className="w-3.5 h-3.5 text-rose-400" />
             )}
             <span className="text-slate-400">Telemetry Stream:</span>
-            <span className={`font-bold ${isConnected ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {isConnected ? 'ONLINE (SSE)' : 'CONNECTING...'}
+            <span className={`font-bold ${isConnected || isDemoMode ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {isConnected ? 'ONLINE (SSE)' : isDemoMode ? 'CONNECTED (DEMO ENGINE)' : 'CONNECTING...'}
             </span>
           </div>
 
