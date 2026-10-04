@@ -44,22 +44,33 @@ body {
 
 /* Custom AG Grid Hyper-Glass Overrides */
 .ag-theme-alpine-dark {
-  --ag-background-color: rgba(10, 15, 30, 0.6);
-  --ag-header-background-color: rgba(15, 23, 42, 0.85);
-  --ag-odd-row-background-color: rgba(15, 23, 42, 0.3);
-  --ag-border-color: rgba(255, 255, 255, 0.07);
-  --ag-header-foreground-color: #94a3b8;
-  --ag-foreground-color: #f1f5f9;
-  --ag-row-hover-color: rgba(6, 182, 212, 0.08);
-  --ag-selected-row-background-color: rgba(6, 182, 212, 0.15);
+  --ag-background-color: rgba(10, 15, 30, 0.7);
+  --ag-header-background-color: rgba(15, 23, 42, 0.95);
+  --ag-odd-row-background-color: rgba(15, 23, 42, 0.45);
+  --ag-border-color: rgba(255, 255, 255, 0.1);
+  --ag-header-foreground-color: #cbd5e1;
+  --ag-foreground-color: #f8fafc;
+  --ag-row-hover-color: rgba(6, 182, 212, 0.12);
+  --ag-selected-row-background-color: rgba(6, 182, 212, 0.2);
   font-family: 'JetBrains Mono', monospace, ui-monospace, sans-serif;
   font-size: 13px;
   border-radius: 12px;
 }
 
+.ag-theme-alpine-dark .ag-cell {
+  display: flex;
+  align-items: center;
+  color: #f1f5f9;
+}
+
+.ag-theme-alpine-dark .ag-header-cell-text {
+  font-weight: 700;
+  color: #94a3b8;
+}
+
 .ag-theme-alpine-dark .ag-root-wrapper {
   background: transparent !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
 }
 
 /* Custom Scrollbars */

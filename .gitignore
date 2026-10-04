@@ -40,3 +40,11 @@ node_modules/
 dist/
 build/
 *.log
+
+# Media & Temporary Recordings (Keep screenshots)
+docs/demo_media/temp_rec*/
+docs/demo_media/*.webm
+docs/demo_media/*.mp4
+docs/demo_media/*.mp3
+
+
