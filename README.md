@@ -37,43 +37,42 @@ Handing an autonomous agent a static credit card or hot wallet is an open invita
 ```mermaid
 flowchart TD
     subgraph Enterprise ["Enterprise Procurement Layer"]
-        User["Business Operator / ERP Goal"] -->|"Prompt / API Intent"| Buyer["Buyer Agent (Gemini 2.5 Flash / Nemotron)"]
+        User["Business Operator / ERP Goal"] -->|"Intent Prompt"| Buyer["Buyer Agent (Gemini 2.5 Flash / Nemotron)"]
     end
 
     subgraph Bilateral ["Bilateral SLA Negotiation"]
-        Buyer <-->|"Bilateral RFP & Terms"| Vendor["Vendor Agent (NVIDIA Nemotron via Nebius)"]
-        Vendor -->|"Signed SLA Contract Proposal"| Arbiter["Sentinel Zero-Trust Arbiter Engine"]
+        Buyer <-->|"Bilateral RFP and Terms"| Vendor["Vendor Agent (NVIDIA Nemotron via Nebius)"]
+        Vendor -->|"Signed Contract Proposal"| Arbiter["Sentinel Zero-Trust Arbiter"]
     end
 
-    subgraph Governance ["Dynamic Policy Governance Vault"]
-        Arbiter -->|"Check Blacklist & Whitelist"| Vault["Enterprise Policy Vault"]
-        Arbiter -->|"Check Velocity & Single Cap"| Vault
-        Arbiter -->|"Evaluate Spending Tier"| Tier{"Tier Assessment"}
-        Tier -->|"Tier 1: Up to $50"| AutoApprove["Autonomous Immediate Escrow"]
-        Tier -->|"Tier 2: $50 to $200"| DeepAudit["Deep Nemotron Milestone Verification"]
-        Tier -->|"Tier 3: Over $200"| HumanAdmin["Pending 1-Click Biometric Sign-off"]
-        Tier -->|"Cap Breach / Rogue Drain"| Intercept["DETERMINISTIC INTERCEPTION (BLOCKED)"]
+    subgraph Governance ["Dynamic Policy Governance"]
+        Arbiter -->|"1. Rules & Velocity Check"| Vault["Enterprise Policy Vault"]
+        Arbiter -->|"2. Spend Evaluation"| Tier{"Tier Assessment"}
+        Tier -->|"Tier 1 (<= $50)"| AutoApprove["Autonomous Immediate Escrow"]
+        Tier -->|"Tier 2 ($50 - $200)"| DeepAudit["Deep Milestone Verification"]
+        Tier -->|"Tier 3 (> $200)"| HumanAdmin["Pending 1-Click Approval"]
+        Tier -->|"Policy Breach"| Intercept["DETERMINISTIC INTERCEPTION"]
     end
 
-    subgraph PayPalEscrow ["PayPal REST API v2 Two-Phase Escrow"]
+    subgraph PayPalEscrow ["PayPal REST API v2 Escrow"]
         AutoApprove -->|"POST Orders Authorize"| PPHold["PayPal Escrow Hold (Funds Locked)"]
         DeepAudit -->|"POST Orders Authorize"| PPHold
-        HumanAdmin -->|"Admin Credential Signed"| PPHold
+        HumanAdmin -->|"Admin Signed"| PPHold
     end
 
-    subgraph DeliverySLA ["Cryptographic SLA Milestone Verification"]
-        Vendor -->|"Delivers Work Output"| Deliverable["Compute Output Artifact"]
-        Deliverable -->|"Compute SHA-256 Hash"| HashCheck{"Deliverable SHA-256 Matches Milestone?"}
-        HashCheck -->|"Valid Cryptographic Proof"| Capture["POST Orders Capture"]
-        HashCheck -->|"Timeout or Hash Mismatch"| Refund["Automated Buyer Refund (Void Escrow)"]
+    subgraph Verification ["Cryptographic SLA Verification"]
+        Vendor -->|"Delivers Output"| Deliverable["Compute Output / Artifact"]
+        Deliverable -->|"Compute SHA-256"| HashCheck{"Hash Verification Match?"}
+        HashCheck -->|"Valid Proof"| Capture["POST Orders Capture"]
+        HashCheck -->|"Timeout / Fake Hash"| Refund["Automated Buyer Refund (Void)"]
     end
 
-    subgraph PayoutAudit ["Settlement & Audit Ledger"]
-        Capture -->|"PayPal Release with 3.5% Take-Rate"| VendorWallet["Vendor PayPal Payout"]
-        Capture -->|"Immutable Block Recorded"| Ledger[("SHA-256 Hash-Chained Audit Ledger")]
-        Refund -->|"Auto-Refund Logged"| Ledger
-        Intercept -->|"Fraud Loss Prevented Logged"| Ledger
-        Ledger --> AGGrid["AG Grid Hyper-Glass Telemetry Cockpit"]
+    subgraph Settlement ["Settlement & Audit Ledger"]
+        Capture -->|"PayPal Release (3.5% Take-Rate)"| VendorWallet["Vendor PayPal Payout"]
+        Capture -->|"Block Recorded"| Ledger[("SHA-256 Audit Ledger")]
+        Refund -->|"Refund Recorded"| Ledger
+        Intercept -->|"Fraud Block Logged"| Ledger
+        Ledger --> AGGrid["AG Grid Hyper-Glass Cockpit"]
     end
 
     style Arbiter fill:#003087,stroke:#0070ba,stroke-width:2px,color:#ffffff
@@ -109,20 +108,44 @@ Protects corporate wallets against adversarial prompt injection, recursive loops
 
 ## Screenshot Gallery
 
-| 01. Enterprise Mission Control Cockpit | 02. Enterprise Policy Vault & Governance |
-|:---:|:---:|
-| ![Mission Control](docs/screenshots/01_main_cockpit_overview.png) | ![Policy Vault](docs/screenshots/02_policy_vault_governance.png) |
-| *Real-time financial metrics, PayPal ROI take-rate (3.5%), and live SSE stream.* | *Dynamic sliders for per-transaction caps ($50-$500), hourly velocity, and whitelist controls.* |
-
-| 03. Tier 1 Autonomous Settlement | 04. Multi-LLM Telemetry Reasoning |
-|:---:|:---:|
-| ![Tier 1 Settlement](docs/screenshots/03_tier1_autonomous_settled.png) | ![Multi-LLM Reasoning](docs/screenshots/04_multi_llm_reasoning_stream.png) |
-| *Autonomous $14.50 escrow settlement with green PASSED badge and PayPal Order ID.* | *NVIDIA Nemotron via Nebius and Gemini 2.5 Flash streaming bilateral contract analysis.* |
-
-| 05. Rogue Drain Intercepted ($1,850) | 06. SLA Breach Auto-Refund Enforcement |
-|:---:|:---:|
-| ![Rogue Drain Intercepted](docs/screenshots/05_rogue_drain_intercepted.png) | ![SLA Auto Refund](docs/screenshots/06_sla_auto_refund_enforcement.png) |
-| *Adversarial prompt injection intercepted, preserving $1,850 in corporate capital.* | *Autonomous buyer refund triggered after SLA timeout, logging REFUNDED state.* |
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <h3>01. Enterprise Mission Control Cockpit</h3>
+      <a href="docs/screenshots/01_main_cockpit_overview.png"><img src="docs/screenshots/01_main_cockpit_overview.png" alt="Mission Control Cockpit" width="100%"/></a>
+      <p><em>Real-time financial metrics, PayPal ROI take-rate (3.5%), and live SSE stream.</em></p>
+    </td>
+    <td width="50%" align="center">
+      <h3>02. Enterprise Policy Vault & Governance</h3>
+      <a href="docs/screenshots/02_policy_vault_governance.png"><img src="docs/screenshots/02_policy_vault_governance.png" alt="Enterprise Policy Vault" width="100%"/></a>
+      <p><em>Dynamic sliders for per-transaction caps ($50-$500), hourly velocity, and whitelist controls.</em></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <h3>03. Tier 1 Autonomous Settlement</h3>
+      <a href="docs/screenshots/03_tier1_autonomous_settled.png"><img src="docs/screenshots/03_tier1_autonomous_settled.png" alt="Tier 1 Settlement" width="100%"/></a>
+      <p><em>Autonomous $14.50 escrow settlement with green PASSED badge and PayPal Order ID.</em></p>
+    </td>
+    <td width="50%" align="center">
+      <h3>04. Multi-LLM Telemetry Reasoning</h3>
+      <a href="docs/screenshots/04_multi_llm_reasoning_stream.png"><img src="docs/screenshots/04_multi_llm_reasoning_stream.png" alt="Multi-LLM Reasoning Stream" width="100%"/></a>
+      <p><em>NVIDIA Nemotron via Nebius and Gemini 2.5 Flash streaming bilateral contract analysis.</em></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <h3>05. Rogue Drain Intercepted ($1,850)</h3>
+      <a href="docs/screenshots/05_rogue_drain_intercepted.png"><img src="docs/screenshots/05_rogue_drain_intercepted.png" alt="Rogue Drain Intercepted" width="100%"/></a>
+      <p><em>Adversarial prompt injection intercepted, preserving $1,850 in corporate capital.</em></p>
+    </td>
+    <td width="50%" align="center">
+      <h3>06. SLA Breach Auto-Refund Enforcement</h3>
+      <a href="docs/screenshots/06_sla_auto_refund_enforcement.png"><img src="docs/screenshots/06_sla_auto_refund_enforcement.png" alt="SLA Auto Refund" width="100%"/></a>
+      <p><em>Autonomous buyer refund triggered after SLA timeout, logging REFUNDED state.</em></p>
+    </td>
+  </tr>
+</table>
 
 ---
 
