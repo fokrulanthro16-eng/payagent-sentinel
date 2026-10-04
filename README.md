@@ -34,20 +34,47 @@ Handing an autonomous agent a static credit card or hot wallet is an open invita
 
 ## System Architecture
 
-```mermaid
-graph TD
-    A[Business Operator / ERP] --> B[Buyer Agent Gemini 2.5]
-    B <--> C[Vendor Agent Nemotron]
-    C --> D[Sentinel Arbiter]
-    D --> E{Policy Vault Check}
-    E -->|Approved| F[PayPal REST v2 Escrow Lock]
-    E -->|Breach| G[Deterministic Interception Blocked]
-    F --> H{SHA-256 Deliverable Verified?}
-    H -->|Valid Proof| I[PayPal Capture 3.5% Take-Rate]
-    H -->|Timeout / Failure| J[Automated Buyer Refund]
-    I --> K[(AG Grid Audit Ledger)]
-    J --> K
-    G --> K
+```text
++-----------------------------------------------------------------------------------+
+|                        ENTERPRISE PROCUREMENT LAYER                               |
+|   [Business Operator / ERP Goal]  --->  [Buyer Agent: Gemini 2.5 Flash / Nemotron]|
++------------------------------------------+----------------------------------------+
+                                           |
+                                           v  (Bilateral SLA Negotiation)
++------------------------------------------+----------------------------------------+
+|   [Vendor Agent: NVIDIA Nemotron] <====> [Sentinel Zero-Trust Arbiter Engine]     |
++------------------------------------------+----------------------------------------+
+                                           |
+                                           v  (Check Limits & Hard-Cap Envelopes)
++-----------------------------------------------------------------------------------+
+|                        DYNAMIC POLICY GOVERNANCE VAULT                            |
+|   - Tier 1 (<= $50): Autonomous Escrow Hold                                       |
+|   - Tier 2 ($50 - $200): Deep Milestone Hash Verification                         |
+|   - Tier 3 (> $200): Pending 1-Click Biometric Sign-Off                           |
+|   - Rogue Drain ($1,850+): DETERMINISTIC INTERCEPTION (BLOCKED)                   |
++------------------------------------------+----------------------------------------+
+                                           |
+                                           v  (POST /v2/checkout/orders)
++-----------------------------------------------------------------------------------+
+|                     PAYPAL REST API v2 TWO-PHASE ESCROW                           |
+|                    [PayPal Escrow Hold (Funds Locked)]                            |
++------------------------------------------+----------------------------------------+
+                                           |
+               +---------------------------+---------------------------+
+               | (Cryptographic Proof)                                 | (Timeout / Breach)
+               v                                                       v
++-----------------------------+                         +-----------------------------+
+|    POST Orders Capture      |                         |    Automated Buyer Refund   |
+| (Release + 3.5% Take-Rate)  |                         |        (Void Escrow)        |
++--------------+--------------+                         +--------------+--------------+
+               |                                                       |
+               +---------------------------+---------------------------+
+                                           |
+                                           v
++-----------------------------------------------------------------------------------+
+|                  IMMUTABLE SHA-256 AG GRID AUDIT LEDGER                           |
+|        [Tamper-Evident State Transitions, HMAC Signatures & PayPal IDs]           |
++-----------------------------------------------------------------------------------+
 ```
 
 ---
