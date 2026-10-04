@@ -1,6 +1,7 @@
 # PayAgent-Sentinel: Zero-Trust Multi-Agent Autonomous Escrow & Cryptographic Policy Engine
 
 [![Build Status](https://img.shields.io/badge/Build-Passing-emerald?style=for-the-badge&logo=github-actions)](https://github.com/fokrulanthro16-eng/payagent-sentinel)
+[![Watch Demo Video](https://img.shields.io/badge/YouTube-Demo_Video_4K-red?style=for-the-badge&logo=youtube)](https://youtu.be/p2R-7amADH8)
 [![PayPal REST API](https://img.shields.io/badge/PayPal_REST_API-v2_Orders_%26_Vault-003087?style=for-the-badge&logo=paypal)](https://developer.paypal.com)
 [![Google Gemini](https://img.shields.io/badge/Google_Gemini-2.5_Flash-4285F4?style=for-the-badge&logo=google)](https://deepmind.google/technologies/gemini/)
 [![NVIDIA Nemotron](https://img.shields.io/badge/NVIDIA_Nemotron-3.5_Lightning-76B900?style=for-the-badge&logo=nvidia)](https://nebius.com)
@@ -36,42 +37,42 @@ Handing an autonomous agent a static credit card or hot wallet is an open invita
 ```mermaid
 flowchart TD
     subgraph Enterprise ["Enterprise Procurement Layer"]
-        User["Business Operator / ERP Goal"] -->|Prompt / API Intent| Buyer["Buyer Agent (Gemini 2.5 Flash / Nemotron)"]
+        User["Business Operator / ERP Goal"] -->|"Prompt / API Intent"| Buyer["Buyer Agent (Gemini 2.5 Flash / Nemotron)"]
     end
 
     subgraph Bilateral ["Bilateral SLA Negotiation"]
-        Buyer <-->|Bilateral RFP & Terms| Vendor["Vendor Agent (NVIDIA Nemotron via Nebius)"]
-        Vendor -->|Signed SLA Contract Proposal| Arbiter["Sentinel Zero-Trust Arbiter Engine"]
+        Buyer <-->|"Bilateral RFP & Terms"| Vendor["Vendor Agent (NVIDIA Nemotron via Nebius)"]
+        Vendor -->|"Signed SLA Contract Proposal"| Arbiter["Sentinel Zero-Trust Arbiter Engine"]
     end
 
     subgraph Governance ["Dynamic Policy Governance Vault"]
-        Arbiter -->|1. Check Blacklist & Whitelist| Vault["Enterprise Policy Vault"]
-        Arbiter -->|2. Check Velocity & Single Cap| Vault
-        Arbiter -->|3. Evaluate Spending Tier| Tier{"Tier Assessment"}
-        Tier -->|Tier 1: <= $50| AutoApprove["Autonomous Immediate Escrow"]
-        Tier -->|Tier 2: $50 - $200| DeepAudit["Deep Nemotron Milestone Verification"]
-        Tier -->|Tier 3: > $200| HumanAdmin["Pending 1-Click Biometric Sign-off"]
-        Tier -->|Cap Breach / Rogue Drain| Intercept["DETERMINISTIC INTERCEPTION (BLOCKED)"]
+        Arbiter -->|"Check Blacklist & Whitelist"| Vault["Enterprise Policy Vault"]
+        Arbiter -->|"Check Velocity & Single Cap"| Vault
+        Arbiter -->|"Evaluate Spending Tier"| Tier{"Tier Assessment"}
+        Tier -->|"Tier 1: Up to $50"| AutoApprove["Autonomous Immediate Escrow"]
+        Tier -->|"Tier 2: $50 to $200"| DeepAudit["Deep Nemotron Milestone Verification"]
+        Tier -->|"Tier 3: Over $200"| HumanAdmin["Pending 1-Click Biometric Sign-off"]
+        Tier -->|"Cap Breach / Rogue Drain"| Intercept["DETERMINISTIC INTERCEPTION (BLOCKED)"]
     end
 
     subgraph PayPalEscrow ["PayPal REST API v2 Two-Phase Escrow"]
-        AutoApprove -->|POST /v2/checkout/orders (Authorize)| PPHold["PayPal Escrow Hold (Funds Locked)"]
-        DeepAudit -->|POST /v2/checkout/orders (Authorize)| PPHold
-        HumanAdmin -->|Admin Credential Signed| PPHold
+        AutoApprove -->|"POST Orders Authorize"| PPHold["PayPal Escrow Hold (Funds Locked)"]
+        DeepAudit -->|"POST Orders Authorize"| PPHold
+        HumanAdmin -->|"Admin Credential Signed"| PPHold
     end
 
     subgraph DeliverySLA ["Cryptographic SLA Milestone Verification"]
-        Vendor -->|Delivers Work Output| Deliverable["Compute Output / Artifact"]
-        Deliverable -->|Compute SHA-256 Hash| HashCheck{"Deliverable SHA-256 == Milestone Hash?"}
-        HashCheck -->|Valid Cryptographic Proof| Capture["POST /v2/checkout/orders/{id}/capture"]
-        HashCheck -->|Timeout / SLA Breach / Fake Hash| Refund["Automated Buyer Refund (Void Escrow)"]
+        Vendor -->|"Delivers Work Output"| Deliverable["Compute Output Artifact"]
+        Deliverable -->|"Compute SHA-256 Hash"| HashCheck{"Deliverable SHA-256 Matches Milestone?"}
+        HashCheck -->|"Valid Cryptographic Proof"| Capture["POST Orders Capture"]
+        HashCheck -->|"Timeout or Hash Mismatch"| Refund["Automated Buyer Refund (Void Escrow)"]
     end
 
     subgraph PayoutAudit ["Settlement & Audit Ledger"]
-        Capture -->|PayPal Release (3.5% Take-Rate)| VendorWallet["Vendor PayPal Payout"]
-        Capture -->|Immutable Block Recorded| Ledger[("SHA-256 Hash-Chained Audit Ledger")]
-        Refund -->|Auto-Refund Logged| Ledger
-        Intercept -->|Fraud Loss Prevented Logged| Ledger
+        Capture -->|"PayPal Release with 3.5% Take-Rate"| VendorWallet["Vendor PayPal Payout"]
+        Capture -->|"Immutable Block Recorded"| Ledger[("SHA-256 Hash-Chained Audit Ledger")]
+        Refund -->|"Auto-Refund Logged"| Ledger
+        Intercept -->|"Fraud Loss Prevented Logged"| Ledger
         Ledger --> AGGrid["AG Grid Hyper-Glass Telemetry Cockpit"]
     end
 
