@@ -1,7 +1,8 @@
 # PayAgent-Sentinel: Zero-Trust Multi-Agent Autonomous Escrow & Cryptographic Policy Engine
 
+[![Live Demo](https://img.shields.io/badge/Vercel-Live_Demo-000000?style=for-the-badge&logo=vercel)](https://frontend-alpha-pied-13.vercel.app)
+[![Official Video Demo](https://img.shields.io/badge/YouTube-Watch_Demo_Video-FF0000?style=for-the-badge&logo=youtube)](https://youtu.be/p2R-7amADH8)
 [![Build Status](https://img.shields.io/badge/Build-Passing-emerald?style=for-the-badge&logo=github-actions)](https://github.com/fokrulanthro16-eng/payagent-sentinel)
-[![Watch Demo Video](https://img.shields.io/badge/YouTube-Demo_Video_4K-red?style=for-the-badge&logo=youtube)](https://youtu.be/p2R-7amADH8)
 [![PayPal REST API](https://img.shields.io/badge/PayPal_REST_API-v2_Orders_%26_Vault-003087?style=for-the-badge&logo=paypal)](https://developer.paypal.com)
 [![Google Gemini](https://img.shields.io/badge/Google_Gemini-2.5_Flash-4285F4?style=for-the-badge&logo=google)](https://deepmind.google/technologies/gemini/)
 [![NVIDIA Nemotron](https://img.shields.io/badge/NVIDIA_Nemotron-3.5_Lightning-76B900?style=for-the-badge&logo=nvidia)](https://nebius.com)
@@ -10,9 +11,12 @@
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=for-the-badge)](LICENSE)
 
 > **PayPal AI Hackathon 2026 Submission**  
-> **Target Tracks:**  
-> 🏆 **Best Use of Agentic Commerce ($5,000)**  
-> 🏆 **Best Use of PayPal + AI ($5,000)**
+> **Target Tracks:** 🏆 **Best Use of Agentic Commerce ($5,000)** | 🏆 **Best Use of PayPal + AI ($5,000)**  
+> 
+> 🔗 **Quick Links:**  
+> - 🌐 **Live Dashboard:** [https://frontend-alpha-pied-13.vercel.app](https://frontend-alpha-pied-13.vercel.app)  
+> - 📺 **Official Video Walkthrough:** [https://youtu.be/p2R-7amADH8](https://youtu.be/p2R-7amADH8)  
+> - 💻 **GitHub Repository:** [https://github.com/fokrulanthro16-eng/payagent-sentinel](https://github.com/fokrulanthro16-eng/payagent-sentinel)
 
 ---
 
